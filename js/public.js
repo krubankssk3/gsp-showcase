@@ -26,12 +26,17 @@
         '<button id="resetDemo">รีเซ็ตข้อมูลตัวอย่าง</button></div>';
       $('#resetDemo').onclick = function () { API.resetDemo(); location.reload(); };
     }
+    UI.loading('กำลังโหลดผลงาน…', 'กำลังสร้างวงกลมจากจุดศูนย์กลาง O');
     API.call('getPublic').then(function (d) {
       prepare(d);
+      UI.setSettings(d.settings);
       renderAll();
+      UI.close();
       route();
     }).catch(function (e) {
+      UI.close();
       $('#worksOut').innerHTML = '<div class="empty">โหลดข้อมูลไม่สำเร็จ: ' + esc(e.message) + '</div>';
+      UI.error(e.message, 'โหลดข้อมูลไม่สำเร็จ');
     });
     window.addEventListener('hashchange', route);
     document.addEventListener('keydown', function (e) {
