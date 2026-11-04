@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ผลงานการแข่งขันสร้างสรรค์ผลงานคณิตศาสตร์โดยใช้โปรแกรม GSP</title>
+<meta name="description" content="คลังผลงานนักเรียนที่ได้รับรางวัลการแข่งขันสร้างสรรค์ผลงานคณิตศาสตร์โดยใช้โปรแกรม The Geometer's Sketchpad (GSP) พร้อมโจทย์และไฟล์ให้ดาวน์โหลดไปฝึก">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { prefix: 'tw-', corePlugins: { preflight: false } };</script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="demoBar"></div>
+
+<header class="topnav">
+  <div class="wrap">
+    <a class="brand" href="#top" id="brand"></a>
+    <nav class="navlinks" id="navlinks">
+      <a href="#champions">ผลงานชนะเลิศ</a>
+      <a href="#works">ทำเนียบผลงาน</a>
+      <a href="#problems">คลังโจทย์ฝึก</a>
+      <a href="#stats">แดชบอร์ดสถิติ</a>
+      <a href="#yearly">สรุปรายปี</a>
+      <a href="admin.html" class="btn btn-sm" style="margin-left:6px">สำหรับกรรมการ</a>
+    </nav>
+    <button class="icon-btn nav-toggle" id="navToggle" aria-label="เมนู"></button>
+  </div>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow">∠ The Geometer's Sketchpad · ระดับประถมศึกษา</span>
+        <h1 id="heroTitle">ผลงานการแข่งขันสร้างสรรค์ผลงานคณิตศาสตร์<br>โดยใช้โปรแกรม <span class="hl">The Geometer's Sketchpad (GSP)</span></h1>
+        <p class="lead" id="heroSub">คลังผลงานนักเรียนที่ได้รับรางวัล พร้อมโจทย์และไฟล์ GSP ให้ครูและนักเรียนดาวน์โหลดไปฝึกทำ</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#works">ดูผลงานทั้งหมด</a>
+          <a class="btn" href="#problems">ดาวน์โหลดโจทย์ฝึก</a>
+        </div>
+        <div class="stats" id="stats4">
+          <div class="stat skel" style="height:76px"></div><div class="stat skel" style="height:76px"></div>
+          <div class="stat skel" style="height:76px"></div><div class="stat skel" style="height:76px"></div>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <svg viewBox="0 0 400 400" class="construct" fill="none" stroke-linecap="round">
+          <circle cx="200" cy="200" r="150" stroke="#14213d" stroke-width="1.5" stroke-dasharray="5 6" style="stroke-dasharray:1200"/>
+          <path class="d2" d="M200 50 L330 275 L70 275 Z" stroke="#2357d9" stroke-width="2.5"/>
+          <path class="d3" d="M200 350 L70 125 L330 125 Z" stroke="#d8423b" stroke-width="2.5"/>
+          <circle class="d3" cx="200" cy="200" r="75" stroke="#f2b632" stroke-width="2.5"/>
+          <path class="d4" d="M200 50 V350 M70 125 L330 275 M330 125 L70 275" stroke="#9aa6c2" stroke-width="1"/>
+          <circle class="d4" cx="200" cy="125" r="75" stroke="#23905a" stroke-width="1.5" opacity=".7"/>
+          <circle class="d4" cx="200" cy="275" r="75" stroke="#23905a" stroke-width="1.5" opacity=".7"/>
+          <g class="pt"><circle cx="200" cy="50" r="6" fill="#d8423b" stroke="#fff" stroke-width="2"/><text x="210" y="44" font-family="Georgia" font-style="italic" font-size="18" fill="#14213d" stroke="none">A</text></g>
+          <g class="pt"><circle cx="330" cy="275" r="6" fill="#2357d9" stroke="#fff" stroke-width="2"/><text x="340" y="292" font-family="Georgia" font-style="italic" font-size="18" fill="#14213d" stroke="none">B</text></g>
+          <g class="pt"><circle cx="70" cy="275" r="6" fill="#2357d9" stroke="#fff" stroke-width="2"/><text x="44" y="292" font-family="Georgia" font-style="italic" font-size="18" fill="#14213d" stroke="none">C</text></g>
+          <g class="pt"><circle cx="200" cy="200" r="6" fill="#14213d" stroke="#fff" stroke-width="2"/><text x="210" y="196" font-family="Georgia" font-style="italic" font-size="18" fill="#14213d" stroke="none">O</text></g>
+          <g class="pt"><rect x="250" y="8" width="140" height="28" rx="4" fill="#fff" stroke="#c9d3e8"/><text x="260" y="27" font-family="monospace" font-size="13" fill="#14213d" stroke="none">m∠BAC = 60.00°</text></g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap" id="announceWrap"></div>
+
+  <!-- CHAMPIONS -->
+  <section class="block" id="champions">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><h2><span class="num">01 / ผลงานล่าสุด</span><span id="champTitle">ผลงานชนะเลิศ</span></h2><p id="champSub"></p></div>
+        <div class="seg" id="champTabs"></div>
+      </div>
+      <div class="podium" id="podium"></div>
+    </div>
+  </section>
+
+  <!-- WORKS -->
+  <section class="block" id="works">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><h2><span class="num">02 / ทำเนียบ</span>ทำเนียบผลงานทุกปีการศึกษา</h2><p>ค้นหาตามปี ระดับชั้น ระดับการแข่งขัน หรือเหรียญรางวัล</p></div>
+        <div class="seg" id="viewSeg">
+          <button data-v="grid" class="on">การ์ดผลงาน</button>
+          <button data-v="table">ตารางประกาศผล</button>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="search"><span id="searchIcon"></span><input class="input" id="fQ" placeholder="ค้นหาชื่อผลงาน โรงเรียน นักเรียน หรือครูผู้ฝึกสอน"></div>
+        <select class="select" id="fYear"></select>
+        <select class="select" id="fLevel"></select>
+        <select class="select" id="fStage"></select>
+        <select class="select" id="fSchool"></select>
+        <select class="select" id="fMedal"></select>
+        <button class="btn btn-ghost" id="fClear">ล้าง</button>
+      </div>
+      <div class="count-row">
+        <span id="count" class="muted"></span>
+        <label class="check"><input type="checkbox" id="fGsp"> เฉพาะผลงานที่มีไฟล์ GSP</label>
+        <button class="btn btn-sm btn-ghost gsp-help-btn" type="button">วิธีเปิดไฟล์ .gsp</button>
+      </div>
+      <div id="worksOut"></div>
+    </div>
+  </section>
+
+  <!-- PROBLEMS -->
+  <section class="block" id="problems">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><h2><span class="num">03 / ฝึกทำ</span>คลังโจทย์และไฟล์ฝึก</h2><p>โจทย์การแข่งขันจริงแต่ละปี เกณฑ์การให้คะแนน และไฟล์ตั้งต้น GSP สำหรับนำไปฝึก</p></div>
+        <div class="seg" id="probSeg"></div>
+      </div>
+      <div class="probs" id="probOut"></div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="block bp" id="stats">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><h2><span class="num">04 / แดชบอร์ด</span>แดชบอร์ดสถิติการแข่งขัน</h2><p>คำนวณจากผลงานที่เผยแพร่ทั้งหมดในระบบ · ชี้เมาส์ที่จุดบนกราฟเพื่อดูค่า</p></div>
+      </div>
+      <div id="kpiDark" class="tw-grid tw-grid-cols-2 md:tw-grid-cols-3 lg:tw-grid-cols-6 tw-gap-4"></div>
+      <div class="tw-grid tw-grid-cols-1 lg:tw-grid-cols-3 tw-gap-4 tw-mt-4">
+        <div class="bp-card glow"><h3>สัดส่วนเหรียญรางวัล <span class="m">m∠ = n/N × 360°</span></h3><div class="sub">มุมของแต่ละส่วนบอกสัดส่วนเหรียญ</div><div id="chDonut"></div><div class="legend-d" id="lgDonut"></div></div>
+        <div class="bp-card glow lg:tw-col-span-2"><h3>แนวโน้มคะแนนรายปี <span class="m">f(ปี) = คะแนน</span></h3><div class="sub">คะแนนสูงสุด · เฉลี่ย · ต่ำสุด ของทุกระดับชั้น</div><div id="chLine"></div><div class="legend-d" id="lgLine"></div></div>
+      </div>
+      <div class="tw-grid tw-grid-cols-1 lg:tw-grid-cols-5 tw-gap-4 tw-mt-4">
+        <div class="bp-card glow lg:tw-col-span-3"><h3>จำนวนผลงานและเหรียญแยกตามปี</h3><div class="sub">แท่งซ้อน: ทอง · เงิน · ทองแดง · เข้าร่วม</div><div id="chStack"></div></div>
+        <div class="bp-card glow lg:tw-col-span-2"><h3>ทำเนียบโรงเรียน <span class="m">Top 8</span></h3><div class="sub">เรียงตามชนะเลิศ → เหรียญทอง → เหรียญเงิน</div><div id="leader"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- YEARLY -->
+  <section class="block bp" id="yearly" style="padding-top:8px">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><h2><span class="num">05 / สรุปรายปี</span>สรุปผลการแข่งขันแต่ละปีการศึกษา</h2><p>เปรียบเทียบกับปีก่อนหน้า พร้อมผู้ชนะเลิศ การกระจายคะแนน และตัวแทนระดับถัดไป</p></div>
+        <div class="seg" id="yearTabs"></div>
+      </div>
+      <div id="yearOut"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot" style="margin-top:0">
+  <div class="wrap">
+    <div>
+      <h4 id="footName">ผลงานการแข่งขันสร้างสรรค์ผลงานคณิตศาสตร์โดยใช้โปรแกรม The Geometer's Sketchpad (GSP)</h4>
+      <p id="footText">พัฒนาโดย นายชิติพัทธ์ นิลวรรณ ตำแหน่ง ครู</p>
+    </div>
+    <div><p>ข้อมูลผลงานใช้เพื่อการศึกษาและเผยแพร่เกียรติคุณของนักเรียน</p><p><a href="admin.html">เข้าสู่ระบบกรรมการ</a></p></div>
+  </div>
+</footer>
+
+<div id="modalRoot"></div>
+<div id="toasts" class="toasts"></div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/charts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="js/report.js"></script>
+<script src="js/public.js"></script>
+</body>
+</html>
