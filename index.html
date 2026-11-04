@@ -24,6 +24,7 @@
       <a href="#problems">คลังโจทย์ฝึก</a>
       <a href="#stats">แดชบอร์ดสถิติ</a>
       <a href="#yearly">สรุปรายปี</a>
+      <a href="#" data-dev>ผู้พัฒนา</a>
       <a href="admin.html" class="btn btn-sm" style="margin-left:6px">สำหรับกรรมการ</a>
     </nav>
     <button class="icon-btn nav-toggle" id="navToggle" aria-label="เมนู"></button>
@@ -152,7 +153,7 @@
   <div class="wrap">
     <div>
       <h4 id="footName">ผลงานการแข่งขันสร้างสรรค์ผลงานคณิตศาสตร์โดยใช้โปรแกรม The Geometer's Sketchpad (GSP)</h4>
-      <p id="footText">พัฒนาโดย นายชิติพัทธ์ นิลวรรณ ตำแหน่ง ครู</p>
+      <p><button type="button" class="dev-link" data-dev id="footText" title="ข้อมูลผู้พัฒนาระบบ">พัฒนาโดย นายชิติพัทธ์ นิลวรรณ ตำแหน่ง ครู</button></p>
     </div>
     <div><p>ข้อมูลผลงานใช้เพื่อการศึกษาและเผยแพร่เกียรติคุณของนักเรียน</p><p><a href="admin.html">เข้าสู่ระบบกรรมการ</a></p></div>
   </div>
@@ -161,11 +162,13 @@
 <div id="modalRoot"></div>
 <div id="toasts" class="toasts"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
 <script src="js/charts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="js/report.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/public.js"></script>
 </body>
 </html>
