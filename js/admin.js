@@ -30,6 +30,7 @@
     });
     $('#nvPublic').innerHTML = ICON('globe') + 'ดูหน้าเผยแพร่';
     $('#logoutBtn').innerHTML = ICON('out') + 'ออกจากระบบ';
+    $('#nvDev').innerHTML = ICON('star') + 'ผู้พัฒนาระบบ';
     if (API.isDemo) {
       $('#demoBar').innerHTML = '<div class="demo-bar">โหมดสาธิต — การเปลี่ยนแปลงถูกเก็บไว้ในเบราว์เซอร์นี้เท่านั้น เปิดหน้าเผยแพร่ในแท็บเดียวกันเพื่อดูผลทันที</div>';
       $('#demoHint').classList.remove('hidden');
@@ -37,26 +38,34 @@
     $('#loginForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var btn = $('#loginBtn');
-      busy(btn, true);
+      busy(btn, true, 'กำลังเข้าสู่ระบบ...');
       $('#loginErr').classList.add('hidden');
+      UI.loading('กำลังเข้าสู่ระบบ…', 'ตรวจสอบรหัสผ่านกรรมการ');
       API.call('login', { password: $('#pw').value }).then(function (d) {
         API.setToken(d.token);
-        return load().then(showApp);
+        return load().then(function () { UI.close(); showApp(); U.toast('ยินดีต้อนรับ ' + (d.name || 'กรรมการ'), 'ok'); });
       }).catch(function (err) {
+        UI.close();
         $('#loginErr').textContent = err.message;
         $('#loginErr').classList.remove('hidden');
+        UI.error(err.message, 'เข้าสู่ระบบไม่สำเร็จ');
       }).then(function () { busy(btn, false); });
     });
     $('#logoutBtn').onclick = function (e) {
       e.preventDefault();
-      API.call('logout').catch(function () {});
-      API.setToken('');
-      DB = null;
-      showLogin();
+      confirmBox('ต้องการออกจากระบบใช่หรือไม่?', 'ออกจากระบบ').then(function (ok) {
+        if (!ok) return;
+        API.call('logout').catch(function () {});
+        API.setToken('');
+        DB = null;
+        showLogin();
+        U.toast('ออกจากระบบแล้ว', 'ok');
+      });
     };
     window.addEventListener('hashchange', function () { if (DB) route(); });
     if (API.getToken()) {
-      load().then(showApp).catch(showLogin);
+      UI.loading('กำลังโหลดข้อมูล…', 'เตรียมแดชบอร์ดกรรมการ');
+      load().then(function () { UI.close(); showApp(); }).catch(function () { UI.close(); showLogin(); });
     } else showLogin();
   }
   function showLogin() {
@@ -74,6 +83,7 @@
   function load() {
     return API.call('getAdmin').then(function (d) {
       DB = d;
+      UI.setSettings(DB.settings);
       CM = {};
       DB.competitions.sort(function (a, b) { return b.year - a.year || String(a.level).localeCompare(String(b.level)); });
       DB.competitions.forEach(function (c) { CM[c.id] = c; });
@@ -85,7 +95,8 @@
   }
   function handleErr(e) {
     if (e && e.code === 'AUTH') { API.setToken(''); showLogin(); U.toast('หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่', 'err'); return; }
-    U.toast(e && e.message ? e.message : 'เกิดข้อผิดพลาด', 'err');
+    UI.close();
+    UI.error(e && e.message ? e.message : 'เกิดข้อผิดพลาด');
   }
   function route() {
     var h = location.hash.replace('#', '');
@@ -115,6 +126,7 @@
   }
   function closeModal() { $('#modalRoot').innerHTML = ''; document.body.style.overflow = ''; }
   function confirmBox(msg, ok, danger) {
+    if (UI.ready()) return UI.confirm({ html: msg, ok: ok, danger: danger });
     return new Promise(function (resolve) {
       modal({
         title: 'ยืนยันการทำรายการ', size: 'sm', body: '<p style="margin:0">' + msg + '</p>',
@@ -323,7 +335,8 @@
         var c = CM[b.getAttribute('data-del')];
         confirmBox('ลบรายการ <b>' + esc(compLabel(c)) + '</b> ?<br><span class="muted">ต้องลบผลการแข่งขันในรายการนี้ให้หมดก่อน</span>', 'ลบรายการ', true).then(function (ok) {
           if (!ok) return;
-          API.call('deleteCompetition', { id: c.id }).then(function () { U.toast('ลบแล้ว', 'ok'); reload(); }).catch(handleErr);
+          UI.loading('กำลังลบรายการแข่งขัน…');
+          API.call('deleteCompetition', { id: c.id }).then(function () { UI.close(); U.toast('ลบรายการแล้ว', 'ok'); reload(); }).catch(handleErr);
         });
       };
     });
@@ -433,7 +446,7 @@
         $('#arYes').onclick = function () {
           var btn = this; busy(btn, true);
           API.call('reorderRanks', { competitionId: RF.comp, ranks: changed.map(function (p) { return { id: p.r.id, rank: p.rank }; }) })
-            .then(function () { closeModal(); U.toast('เรียงอันดับแล้ว', 'ok'); reload(); })
+            .then(function () { closeModal(); UI.success('เรียงอันดับเรียบร้อย', 'ปรับอันดับใหม่ ' + changed.length + ' รายการ'); reload(); })
             .catch(function (e) { busy(btn, false); handleErr(e); });
         };
       }
@@ -489,7 +502,8 @@
         var r = findResult(b.getAttribute('data-del'));
         confirmBox('ลบผลงาน <b>' + esc(r.title || r.school) + '</b> (อันดับ ' + esc(r.rank) + ') ?<br><span class="muted">รูปภาพและไฟล์ที่แนบจะถูกย้ายไปถังขยะของ Drive</span>', 'ลบผลงาน', true).then(function (ok) {
           if (!ok) return;
-          API.call('deleteResult', { id: r.id }).then(function () { U.toast('ลบแล้ว', 'ok'); reload(); }).catch(handleErr);
+          UI.loading('กำลังลบผลงาน…');
+          API.call('deleteResult', { id: r.id }).then(function () { UI.close(); U.toast('ลบผลงานแล้ว', 'ok'); reload(); }).catch(handleErr);
         });
       };
     });
@@ -634,8 +648,10 @@
       var btn = this, cid = $('#iComp').value;
       var rows = parsed.map(function (r) { var o = U.clone(r); delete o._err; return o; });
       busy(btn, true, 'กำลังนำเข้า...');
+      UI.loading('กำลังนำเข้าข้อมูล…', rows.length + ' รายการ');
       API.call('bulkImport', { competitionId: cid, published: $('#iPub').checked, rows: rows }).then(function (d) {
-        U.toast('นำเข้าแล้ว ' + d.count + ' รายการ', 'ok');
+        UI.close();
+        UI.success('นำเข้าเรียบร้อย', 'เพิ่มผลการแข่งขัน ' + d.count + ' รายการ');
         parsed = [];
         RF.comp = cid;
         return load().then(function () { go('results'); });
@@ -715,6 +731,17 @@
       '<div class="field span-2"><label>ที่อยู่เว็บหน้าเผยแพร่ (ใช้สร้าง QR Code)</label><input class="input" id="sUrl" value="' + esc(s.publicUrl || '') + '" placeholder="เช่น https://gsp-showcase.vercel.app/"><span class="hint">เว้นว่าง = ใช้ที่อยู่ปัจจุบันอัตโนมัติ (' + esc(Report.base({})) + ')</span></div>' +
       '<div class="field span-2"><label>หน่วยงาน / คณะกรรมการที่ออกประกาศ</label><input class="input" id="sOrg" value="' + esc(s.reportOrg || '') + '" placeholder="เช่น คณะกรรมการตัดสินการแข่งขัน"></div>' +
       '<div class="field span-2"><label>ผู้ลงนามท้ายประกาศ (บรรทัดละ 1 คน: ชื่อ | ตำแหน่ง)</label><textarea class="textarea" id="sSign" placeholder="นายสมชาย ใจดี | ประธานกรรมการ">' + esc(s.signers || '') + '</textarea><span class="hint">เว้นชื่อว่างไว้ได้ เช่น " | กรรมการ" จะเป็นเส้นประให้เขียนชื่อเอง</span></div>' +
+      '<div class="form-sec">ข้อมูลผู้พัฒนา (การ์ด "ผู้พัฒนาระบบ")</div>' +
+      '<div class="field"><label>ชื่อ-สกุล</label><input class="input" id="dName" value="' + esc(s.devName || '') + '"></div>' +
+      '<div class="field"><label>ตำแหน่ง</label><input class="input" id="dPos" value="' + esc(s.devPosition || '') + '"></div>' +
+      '<div class="field span-2"><label>หน่วยงาน (ไม่บังคับ)</label><input class="input" id="dOrg" value="' + esc(s.devOrg || '') + '" placeholder="เว้นว่าง = ไม่แสดง"></div>' +
+      '<div class="field span-2"><label>ลิงก์รูปโปรไฟล์</label><input class="input" id="dPhoto" value="' + esc(s.devPhotoUrl || '') + '" placeholder="https://... (เว้นว่าง = แสดงอักษรย่อ)"></div>' +
+      '<div class="field span-2"><label>แนะนำตัวสั้น ๆ</label><input class="input" id="dBio" value="' + esc(s.devBio || '') + '"></div>' +
+      '<div class="field"><label>GitHub</label><input class="input" id="dGh" value="' + esc(s.devGithub || '') + '" placeholder="ชื่อผู้ใช้"></div>' +
+      '<div class="field"><label>อีเมล</label><input class="input" id="dMail" value="' + esc(s.devEmail || '') + '"></div>' +
+      '<div class="field"><label>LINE ID</label><input class="input" id="dLine" value="' + esc(s.devLine || '') + '"></div>' +
+      '<div class="field"><label>Facebook</label><input class="input" id="dFb" value="' + esc(s.devFacebook || '') + '" placeholder="ชื่อเพจ หรือลิงก์"></div>' +
+      '<div class="span-2"><button type="button" class="btn btn-sm" data-dev>' + ICON('eye') + 'ดูตัวอย่างการ์ดผู้พัฒนา</button></div>' +
       '<div class="span-2"><button type="submit" class="btn btn-primary" id="sSave">บันทึกการตั้งค่า</button></div></form></div>' +
       '<div><div class="panel"><h3>เปลี่ยนรหัสผ่านกรรมการ</h3><form id="pf" style="display:flex;flex-direction:column;gap:12px">' +
       '<div class="field"><label>รหัสผ่านเดิม</label><input class="input" type="password" id="pOld" autocomplete="current-password"></div>' +
@@ -733,10 +760,12 @@
         siteTitle: $('#sTitle').value.trim(), siteSubtitle: $('#sSub').value.trim(), announcement: $('#sAnn').value.trim(),
         footerText: $('#sFoot').value.trim(), goldMin: g, silverMin: si, bronzeMin: b,
         levels: $('#sLv').value.trim(), stages: $('#sSt').value.trim(),
-        publicUrl: $('#sUrl').value.trim(), reportOrg: $('#sOrg').value.trim(), signers: $('#sSign').value.trim()
+        publicUrl: $('#sUrl').value.trim(), reportOrg: $('#sOrg').value.trim(), signers: $('#sSign').value.trim(),
+        devName: $('#dName').value.trim(), devPosition: $('#dPos').value.trim(), devOrg: $('#dOrg').value.trim(), devPhotoUrl: $('#dPhoto').value.trim(),
+        devBio: $('#dBio').value.trim(), devGithub: $('#dGh').value.trim(), devEmail: $('#dMail').value.trim(), devLine: $('#dLine').value.trim(), devFacebook: $('#dFb').value.trim()
       };
       var btn = $('#sSave'); busy(btn, true);
-      API.call('saveSettings', data).then(function () { DB.settings = data; U.toast('บันทึกการตั้งค่าแล้ว', 'ok'); })
+      API.call('saveSettings', data).then(function () { DB.settings = data; UI.setSettings(data); UI.success('บันทึกการตั้งค่าแล้ว'); })
         .catch(handleErr).then(function () { busy(btn, false); });
     };
     $('#pf').onsubmit = function (e) {
