@@ -78,10 +78,62 @@ var U = (function () {
   function uid(p) { return (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   var ART_CACHE = {};
+  /* ตราโรงเรียนจำลอง (ใช้เฉพาะโหมดสาธิต) */
+  function emblem(name) {
+    var h = 0, i;
+    for (i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+    var c1 = 'hsl(' + h + ',62%,42%)', c2 = 'hsl(' + ((h + 45) % 360) + ',70%,58%)', ch = initialOf(name);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c2 + '"/><stop offset="1" stop-color="' + c1 + '"/></linearGradient></defs>' +
+      '<circle cx="100" cy="100" r="94" fill="#fff" stroke="' + c1 + '" stroke-width="8"/><circle cx="100" cy="100" r="76" fill="url(#g)"/>' +
+      '<circle cx="100" cy="100" r="64" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 5" opacity=".7"/>' +
+      '<path d="M100 44 L148 128 L52 128Z" fill="none" stroke="#fff" stroke-width="3" opacity=".35"/>' +
+      '<text x="100" y="122" text-anchor="middle" font-family="Tahoma,sans-serif" font-size="64" font-weight="700" fill="#fff">' + esc(ch) + '</text></svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+  /* ---------- โรงเรียน / โลโก้ ---------- */
+  var SCH = {};
+  function normSchool(n) { return String(n || '').replace(/^\s*โรงเรียน/, '').replace(/\s+/g, '').toLowerCase(); }
+  function initialOf(n) {
+    var s = String(n || '').replace(/^\s*โรงเรียน/, '').replace(/^\s*(บ้าน|ชุมชน|อนุบาล)/, '').trim();
+    var m = /[ก-ฮA-Za-z0-9]/.exec(s);
+    return m ? m[0] : '?';
+  }
+  function setSchools(list) {
+    SCH = {};
+    (list || []).forEach(function (s) { if (s && s.name && s.logo && (s.logo.id || s.logo.url)) SCH[normSchool(s.name)] = s.logo; });
+  }
+  function logoOf(name) { return SCH[normSchool(name)] || null; }
+  function logoHtml(name, cls) {
+    var l = logoOf(name);
+    return l ? '<img class="slogo ' + (cls || '') + '" alt="" loading="lazy" src="' + esc(imgSrc(l, 240)) + '">' :
+      '<span class="slogo ini ' + (cls || '') + '">' + esc(initialOf(name)) + '</span>';
+  }
+  /* ภาพตัวอย่างของไฟล์ GSP + รูปผลงานเพิ่มเติม */
+  function gallery(r) {
+    var out = [];
+    (r && r.files || []).forEach(function (f) { if (isGsp(f.name) && f.preview) { var p = clone(f.preview); p._gsp = f.name; out.push(p); } });
+    return out.concat((r && r.images) || []);
+  }
+  function coverOf(r) { return gallery(r)[0] || null; }
+  /* ภาพปกการ์ด: ภาพตัวอย่าง GSP → รูปผลงาน → โลโก้โรงเรียน */
+  function thumbHtml(r, w) {
+    var c = coverOf(r);
+    if (c) return '<img loading="lazy" alt="" src="' + esc(imgSrc(c, w || 600)) + '">';
+    return '<div class="logo-thumb">' + logoHtml(r.school, 'xl') + '</div>';
+  }
+  function schoolHead(r, tag) {
+    tag = tag || 'h3';
+    return '<' + tag + ' class="sch-h">' + logoHtml(r.school, 'sm') + '<span>' + esc(r.school) + '</span></' + tag + '>' +
+      (r.title ? '<div class="wt">' + esc(r.title) + '</div>' : '');
+  }
   function imgSrc(f, w) {
     if (!f) return '';
     if (f.url && f.url.indexOf('art:') === 0) {
       if (!ART_CACHE[f.url]) { var a = f.url.split(':'); ART_CACHE[f.url] = Art.uri(Number(a[1]), Number(a[2])); }
+      return ART_CACHE[f.url];
+    }
+    if (f.url && f.url.indexOf('logo:') === 0) {
+      if (!ART_CACHE[f.url]) ART_CACHE[f.url] = emblem(f.url.slice(5));
       return ART_CACHE[f.url];
     }
     if (f.url) return f.url;
@@ -161,6 +213,8 @@ var U = (function () {
     bindGlow: bindGlow, dialog: dialog, gspHelp: gspHelp,
     esc: esc, $: $, $$: $$, fmtDate: fmtDate, fmtDateTime: fmtDateTime, rankLabel: rankLabel,
     medalAuto: medalAuto, medalOf: medalOf, medalCls: medalCls, medalTag: medalTag, rankBadge: rankBadge,
+    normSchool: normSchool, initialOf: initialOf, setSchools: setSchools, logoOf: logoOf, logoHtml: logoHtml,
+    gallery: gallery, coverOf: coverOf, thumbHtml: thumbHtml, schoolHead: schoolHead,
     ext: ext, extCls: extCls, isGsp: isGsp, fmtSize: fmtSize, uid: uid, clone: clone, imgSrc: imgSrc, dlUrl: dlUrl, viewUrl: viewUrl,
     toast: toast, copy: copy, store: store, sortResults: sortResults
   };
@@ -368,16 +422,15 @@ var Demo = (function () {
           results.push({
             id: 'r' + y + (li + 1) + i, competitionId: cid, rank: i, school: SCHOOLS[(yi * 3 + li * 5 + i * 7) % SCHOOLS.length],
             students: [student(), student()], coaches: r() > 0.4 ? [pick(COACH), pick(COACH)] : [pick(COACH)],
-            score: sc, medal: '', title: title, advance: i <= 1,
+            score: sc, medal: '', title: i % 2 ? title : '', advance: i <= 1,
             description: 'ผลงาน "' + title + '" ใช้การ' + pick(['หมุนรอบจุด', 'สะท้อนข้ามเส้นตรง', 'เลื่อนขนานตามเวกเตอร์', 'ย่อขยายจากจุดศูนย์กลาง']) +
               'ร่วมกับการสร้างวงกลมและรูปหลายเหลี่ยมด้านเท่า นักเรียนอธิบายขั้นตอนการสร้างได้ชัดเจน มีการใช้ Action Button และ Animation ประกอบการนำเสนอ\n\n(ข้อมูลตัวอย่างสำหรับสาธิตระบบ)',
-            images: [
-              { id: 'i' + s1 + 'a', name: 'ผลงาน.png', mime: 'image/svg+xml', url: 'art:' + s1 + ':' + (s1 % 6) },
-              { id: 'i' + s1 + 'b', name: 'ขั้นตอนการสร้าง.png', mime: 'image/svg+xml', url: 'art:' + (s1 + 11) + ':' + ((s1 + 2) % 6) },
-              { id: 'i' + s1 + 'c', name: 'ภาพขยาย.png', mime: 'image/svg+xml', url: 'art:' + (s1 + 23) + ':' + ((s1 + 4) % 6) }
+            images: i % 3 === 0 ? [] : [
+              { id: 'i' + s1 + 'b', name: 'ขั้นตอนการสร้าง.png', mime: 'image/svg+xml', url: 'art:' + (s1 + 11) + ':' + ((s1 + 2) % 6) }
             ],
             files: [
-              { id: 'g' + s1, name: title.replace(/\s/g, '_') + '.gsp', mime: 'application/octet-stream', size: 30000 + Math.floor(r() * 90000), kind: 'ไฟล์ GSP' },
+              { id: 'g' + s1, name: title.replace(/\s/g, '_') + '.gsp', mime: 'application/octet-stream', size: 30000 + Math.floor(r() * 90000), kind: 'ไฟล์ GSP',
+                preview: i === 6 ? null : { id: 'v' + s1, name: 'ภาพตัวอย่าง.png', mime: 'image/svg+xml', url: 'art:' + s1 + ':' + (s1 % 6) } },
               { id: 'p' + s1, name: 'แนวคิดและขั้นตอนการสร้าง.pdf', mime: 'application/pdf', size: 150000 + Math.floor(r() * 400000), kind: 'เอกสาร' }
             ],
             views: Math.floor(r() * 400) + (n - i) * 30, downloads: Math.floor(r() * 120),
@@ -388,6 +441,7 @@ var Demo = (function () {
       });
     });
     return {
+      schools: SCHOOLS.map(function (n, k) { return { id: 's' + k, name: n, logo: k === 9 ? null : { id: 'lg' + k, name: 'logo.png', mime: 'image/svg+xml', url: 'logo:' + n }, updatedAt: now }; }),
       settings: {
         siteTitle: CONFIG.SYSTEM_NAME,
         siteSubtitle: 'คลังผลงานนักเรียนที่ได้รับรางวัล พร้อมโจทย์และไฟล์ GSP ให้ครูและนักเรียนดาวน์โหลดไปฝึกทำ',
@@ -417,8 +471,9 @@ var Demo = (function () {
   function load() {
     if (db) return db;
     db = U.store(KEY) || seed();
-    var def = seed().settings;
+    var sd = seed(), def = sd.settings;
     Object.keys(def).forEach(function (k) { if (db.settings[k] === undefined) db.settings[k] = def[k]; });
+    if (!db.schools) db.schools = sd.schools;
     return db;
   }
   function save() {
@@ -435,7 +490,7 @@ var Demo = (function () {
     getPublic: function () {
       var pubC = db.competitions.filter(function (c) { return c.published; });
       var ids = {}; pubC.forEach(function (c) { ids[c.id] = 1; });
-      return { settings: db.settings, competitions: pubC, results: db.results.filter(function (r) { return r.published && ids[r.competitionId]; }) };
+      return { settings: db.settings, schools: db.schools || [], competitions: pubC, results: db.results.filter(function (r) { return r.published && ids[r.competitionId]; }) };
     },
     hit: function (d) {
       var i = findIdx(db.results, d.id);
@@ -520,6 +575,32 @@ var Demo = (function () {
       (d.ranks || []).forEach(function (x) { var i = findIdx(db.results, x.id); if (i > -1) db.results[i].rank = Number(x.rank); });
       log('edit', 'เรียงอันดับใหม่จากคะแนน ' + (d.ranks || []).length + ' รายการ');
       return true;
+    },
+    saveSchool: function (d, t) {
+      need(t);
+      db.schools = db.schools || [];
+      var k = U.normSchool(d.name), hit = null;
+      db.schools.forEach(function (s) { if (U.normSchool(s.name) === k) hit = s; });
+      if (hit) { hit.logo = d.logo || null; hit.updatedAt = new Date().toISOString(); if (d.newName) hit.name = d.newName; }
+      else { hit = { id: U.uid('s'), name: d.name, logo: d.logo || null, updatedAt: new Date().toISOString() }; db.schools.push(hit); }
+      log('edit', (d.logo ? 'บันทึกโลโก้ ' : 'ลบโลโก้ ') + d.name);
+      return hit;
+    },
+    migrateLogos: function (d, t) {
+      need(t);
+      db.schools = db.schools || [];
+      var moved = 0, schools = 0, had = {};
+      db.schools.forEach(function (s) { if (s.logo) had[U.normSchool(s.name)] = 1; });
+      db.results.forEach(function (r) {
+        if (!(r.images || []).length || had[U.normSchool(r.school)]) return;
+        var k = U.normSchool(r.school), hit = null;
+        db.schools.forEach(function (s) { if (U.normSchool(s.name) === k) hit = s; });
+        if (!hit) { hit = { id: U.uid('s'), name: r.school, logo: null }; db.schools.push(hit); }
+        if (!hit.logo) { hit.logo = r.images[0]; schools++; }
+        r.images = r.images.slice(1); moved++;
+      });
+      log('edit', 'ย้ายภาพปกเป็นโลโก้โรงเรียน ' + schools + ' โรงเรียน');
+      return { moved: moved, schools: schools };
     },
     resetDemo: function () { db = seed(); return true; }
   };
