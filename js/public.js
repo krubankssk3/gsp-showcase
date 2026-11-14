@@ -4,11 +4,18 @@
 (function () {
   'use strict';
   var $ = U.$, $$ = U.$$, esc = U.esc;
+  var PG = {
+    works: Pager('works', 12, [12, 24, 48]),
+    table: Pager('worksTbl', 20, [20, 50, 100]),
+    school: Pager('school', 9, [9, 18, 36]),
+    prob: Pager('prob', 6, [6, 12, 24])
+  };
+  function resetWorks() { PG.works.reset(); PG.table.reset(); }
   var S = {
     settings: {}, comps: [], compMap: {}, results: [],
     f: { q: '', year: '', level: '', stage: '', medal: '', gsp: false, school: '' },
     selYear: '',
-    view: 'grid', limit: 12, champLevel: '', probYear: '', list: [], cur: null, imgIdx: 0, seen: {}
+    view: 'grid', champLevel: '', probYear: '', list: [], cur: null, imgIdx: 0, seen: {}
   };
 
   /* ---------- เริ่มต้น ---------- */
@@ -18,7 +25,7 @@
     $('#searchIcon').outerHTML = ICON('search');
     U.bindGlow();
     $$('.gsp-help-btn').forEach(function (b) { b.onclick = U.gspHelp; });
-    $('#fGsp').onchange = function () { S.f.gsp = this.checked; S.limit = 12; renderWorks(); };
+    $('#fGsp').onchange = function () { S.f.gsp = this.checked; resetWorks(); renderWorks(); };
     $('#navToggle').onclick = function () { $('#navlinks').classList.toggle('open'); };
     $$('#navlinks a').forEach(function (a) { a.addEventListener('click', function () { $('#navlinks').classList.remove('open'); }); });
     if (API.isDemo) {
@@ -146,11 +153,11 @@
     $('#fMedal').innerHTML = opt('', 'ทุกเหรียญ', f.medal) + ['ทอง', 'เงิน', 'ทองแดง', 'เข้าร่วม'].map(function (m) { return opt(m, m === 'เข้าร่วม' ? 'เข้าร่วม' : 'เหรียญ' + m, f.medal); }).join('') + opt('top3', 'เฉพาะอันดับ 1–3', f.medal);
     $('#fQ').value = f.q;
     var t = null;
-    $('#fQ').oninput = function () { clearTimeout(t); t = setTimeout(function () { S.f.q = $('#fQ').value.trim(); S.limit = 12; renderWorks(); }, 200); };
+    $('#fQ').oninput = function () { clearTimeout(t); t = setTimeout(function () { S.f.q = $('#fQ').value.trim(); resetWorks(); renderWorks(); }, 200); };
     ['Year', 'Level', 'Stage', 'Medal', 'School'].forEach(function (k) {
-      $('#f' + k).onchange = function () { S.f[k.toLowerCase()] = this.value; S.limit = 12; renderWorks(); };
+      $('#f' + k).onchange = function () { S.f[k.toLowerCase()] = this.value; resetWorks(); renderWorks(); };
     });
-    $('#fClear').onclick = function () { S.f = { q: '', year: '', level: '', stage: '', medal: '', gsp: false, school: '' }; $('#fGsp').checked = false; renderFilters(); renderWorks(); };
+    $('#fClear').onclick = function () { resetWorks(); S.f = { q: '', year: '', level: '', stage: '', medal: '', gsp: false, school: '' }; $('#fGsp').checked = false; renderFilters(); renderWorks(); };
     $$('#viewSeg button').forEach(function (b) {
       b.onclick = function () {
         S.view = b.getAttribute('data-v');
@@ -198,12 +205,12 @@
     $('#count').textContent = 'พบ ' + list.length + ' ผลงาน';
     if (!list.length) { $('#worksOut').innerHTML = '<div class="empty">ไม่พบผลงานตามเงื่อนไขที่เลือก</div>'; return; }
     if (S.view === 'grid') {
-      $('#worksOut').innerHTML = '<div class="cards">' + list.slice(0, S.limit).map(cardHtml).join('') + '</div>' +
-        (list.length > S.limit ? '<div style="text-align:center;margin-top:22px"><button class="btn" id="more">แสดงเพิ่มอีก ' + Math.min(12, list.length - S.limit) + ' ผลงาน (เหลือ ' + (list.length - S.limit) + ')</button></div>' : '');
-      if ($('#more')) $('#more').onclick = function () { S.limit += 12; renderWorks(); };
+      var part = PG.works.slice(list);
+      $('#worksOut').innerHTML = '<div class="cards">' + part.map(cardHtml).join('') + '</div>' + PG.works.html(list.length, 'ผลงาน');
+      PG.works.bind($('#worksOut'), renderWorks, function () { return document.getElementById('works'); });
     } else {
-      var groups = [], gm = {};
-      list.forEach(function (r) {
+      var groups = [], gm = {}, partT = PG.table.slice(list);
+      partT.forEach(function (r) {
         if (!gm[r.competitionId]) { gm[r.competitionId] = { c: r._c, rows: [] }; groups.push(gm[r.competitionId]); }
         gm[r.competitionId].rows.push(r);
       });
@@ -216,7 +223,8 @@
               '</td><td>' + esc(r.school) + '</td><td>' + (r.students || []).map(esc).join('<br>') + '</td><td>' + (r.coaches || []).map(esc).join('<br>') +
               '</td><td class="mono">' + esc(r.score) + '</td><td>' + U.medalTag(r._m) + '</td></tr>';
           }).join('') + '</tbody></table></div></div>';
-      }).join('');
+      }).join('') + PG.table.html(list.length, 'ผลงาน');
+      PG.table.bind($('#worksOut'), renderWorks, function () { return document.getElementById('works'); });
     }
     $$('#worksOut [data-id]').forEach(function (el) { el.onclick = function () { openWork(el.getAttribute('data-id')); }; });
   }
@@ -245,10 +253,14 @@
     $('#probSeg').innerHTML = '<button data-y="all"' + (S.probYear === 'all' ? ' class="on"' : '') + '>ทุกปี</button>' + ys.map(function (y) {
       return '<button data-y="' + y + '"' + (String(y) === S.probYear ? ' class="on"' : '') + '>' + y + '</button>';
     }).join('');
-    $$('#probSeg button').forEach(function (b) { b.onclick = function () { S.probYear = b.getAttribute('data-y'); renderProblems(); }; });
+    $$('#probSeg button').forEach(function (b) { b.onclick = function () { S.probYear = b.getAttribute('data-y'); PG.prob.reset(); renderProblems(); }; });
     var comps = S.comps.filter(function (c) { return S.probYear === 'all' || String(c.year) === S.probYear; })
       .sort(function (a, b) { return b.year - a.year || String(a.level).localeCompare(String(b.level)); });
-    if (!comps.length) { $('#probOut').innerHTML = '<div class="empty">ยังไม่มีโจทย์</div>'; return; }
+    if (!comps.length) { $('#probOut').innerHTML = '<div class="empty">ยังไม่มีโจทย์</div>'; $('#probPager').innerHTML = ''; return; }
+    var allC = comps.length;
+    comps = PG.prob.slice(comps);
+    $('#probPager').innerHTML = PG.prob.html(allC, 'รายการ');
+    PG.prob.bind($('#probPager'), renderProblems, function () { return document.getElementById('problems'); });
     $('#probOut').innerHTML = comps.map(function (c) {
       var n = S.results.filter(function (r) { return r.competitionId === c.id; }).length;
       return '<div class="prob glow"><div class="yr">ปีการศึกษา ' + esc(c.year) + ' · ' + esc(c.stage) + '</div>' +
@@ -262,7 +274,7 @@
     $$('#probOut [data-c]').forEach(function (b) {
       b.onclick = function () {
         var c = S.compMap[b.getAttribute('data-c')];
-        S.f = { q: '', year: String(c.year), level: c.level, stage: c.stage, medal: '', gsp: false, school: '' };
+        resetWorks(); S.f = { q: '', year: String(c.year), level: c.level, stage: c.stage, medal: '', gsp: false, school: '' };
         renderFilters(); renderWorks();
         document.getElementById('works').scrollIntoView();
       };
@@ -398,7 +410,7 @@
       var c = S.compMap[h.slice(2)];
       if (S.cur || S.curSchool) closeModal(true);
       if (c) {
-        S.f = { q: '', year: String(c.year), level: c.level, stage: c.stage, medal: '', gsp: false, school: '' };
+        resetWorks(); S.f = { q: '', year: String(c.year), level: c.level, stage: c.stage, medal: '', gsp: false, school: '' };
         S.view = 'table';
         $$('#viewSeg button').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-v') === 'table'); });
         renderFilters(); renderWorks();
@@ -417,6 +429,7 @@
   function openSchool(name, fromHash) {
     var rows = S.results.filter(function (r) { return r.school === name; });
     if (!rows.length) return;
+    if (S.pgSchool !== name) { PG.school.reset(); S.pgSchool = name; }
     S.cur = null; S.curSchool = name;
     if (!fromHash) location.hash = 's-' + Report.schoolCode(name);
     var st = { w: 0, g: 0, s: 0, b: 0, y: {}, stu: 0 };
@@ -434,11 +447,12 @@
       '<div class="school-qr">' + U.logoHtml(name, 'lg') + '<div class="qr-inline">' + Report.qrSvg(link) + '</div><div><b>QR Code ของโรงเรียน</b><div class="muted" style="font-size:12.5px">ปีการศึกษา ' + Object.keys(st.y).sort().join(', ') + '</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-sm" id="sCopy">' + ICON('link') + 'คัดลอกลิงก์</button>' +
       '<button class="btn btn-sm btn-primary" id="sPrint">' + ICON('dl') + 'รายงาน PDF</button></div></div></div></div>' +
-      '<div class="cards" style="margin-top:18px">' + rows.map(cardHtml).join('') + '</div></div></div></div>';
+      '<div class="cards" style="margin-top:18px">' + PG.school.slice(rows).map(cardHtml).join('') + '</div>' + PG.school.html(rows.length, 'ผลงาน') + '</div></div></div>';
     document.body.style.overflow = 'hidden';
     $('#mClose').onclick = function () { closeModal(); };
     $('#mbg').onclick = function (e) { if (e.target.id === 'mbg') closeModal(); };
     $$('#modalRoot .card').forEach(function (el) { el.onclick = function () { S.back = name; openWork(el.getAttribute('data-id')); }; });
+    PG.school.bind($('#modalRoot'), function () { openSchool(name, true); var m = $('#mbg'); if (m) m.scrollTop = 0; });
     $('#sCopy').onclick = function () { U.copy(link).then(function () { U.toast('คัดลอกลิงก์แล้ว', 'ok'); }).catch(function () { U.toast(link); }); };
     $('#sPrint').onclick = function () { Report.open('รายงานผลงาน ' + name, Report.school(Report.ctx(S.settings, S.comps, S.results), [name])); };
   }
