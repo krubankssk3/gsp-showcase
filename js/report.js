@@ -78,8 +78,8 @@ var Report = (function () {
   function today() { return U.fmtDate(new Date().toISOString()); }
 
   /* ---------- ส่วนประกอบหน้า ---------- */
-  function head(st, kicker, title, sub) {
-    return '<header class="rp-head">' + BRAND_MARK + '<div class="rp-ht"><div class="rp-k">' + esc(kicker) + '</div><h1>' + esc(title) + '</h1>' +
+  function head(st, kicker, title, sub, logoName) {
+    return '<header class="rp-head">' + (logoName ? U.logoHtml(logoName, 'rp') : BRAND_MARK) + '<div class="rp-ht"><div class="rp-k">' + esc(kicker) + '</div><h1>' + esc(title) + '</h1>' +
       (sub ? '<div class="rp-sub">' + sub + '</div>' : '') + '</div></header>';
   }
   function foot(st, pageLabel) {
@@ -110,7 +110,7 @@ var Report = (function () {
         '<div class="rp-chips"><span>ทั้งหมด <b>' + rows.length + '</b> ทีม</span><span class="g">เหรียญทอง <b>' + md['ทอง'] + '</b></span><span class="s">เหรียญเงิน <b>' + md['เงิน'] + '</b></span><span class="b">เหรียญทองแดง <b>' + md['ทองแดง'] + '</b></span></div>' +
         '<table class="rp-tbl"><thead><tr><th style="width:54px">อันดับ</th><th>รางวัล</th><th>โรงเรียน</th><th>นักเรียน</th><th>ครูผู้ฝึกสอน</th><th style="width:60px">คะแนน</th><th style="width:92px">เหรียญ</th></tr></thead><tbody>' +
         (rows.length ? rows.map(function (r) {
-          return '<tr><td class="c"><b>' + esc(r.rank) + '</b></td><td>' + esc(U.rankLabel(r.rank)) + (r.advance ? '<div class="adv">ตัวแทนระดับถัดไป</div>' : '') + '</td><td>' + esc(r.school) +
+          return '<tr><td class="c"><b>' + esc(r.rank) + '</b></td><td>' + esc(U.rankLabel(r.rank)) + (r.advance ? '<div class="adv">ตัวแทนระดับถัดไป</div>' : '') + '</td><td><div class="rp-sch">' + U.logoHtml(r.school, 'xs') + '<span>' + esc(r.school) + '</span></div>' +
             '</td><td>' + people(r.students) + '</td><td>' + people(r.coaches) + '</td><td class="c">' + esc(r.score) + '</td><td class="c">' + U.medalTag(r._m) + '</td></tr>';
         }).join('') : '<tr><td colspan="7" class="c">ยังไม่มีผลการแข่งขัน</td></tr>') + '</tbody></table>' +
         (adv.length ? '<p class="rp-note"><b>ผู้ได้รับคัดเลือกเป็นตัวแทน:</b> ' + adv.map(function (r) { return esc(r.school) + ' (อันดับ ' + r.rank + ')'; }).join(', ') + '</p>' : '') +
@@ -133,17 +133,17 @@ var Report = (function () {
       for (i = 0; i < Math.max(1, rows.length); i += per) chunks.push(rows.slice(i, i + per));
       return chunks.map(function (part, pi) {
         return '<section class="sheet">' +
-          (pi === 0 ? head(cx.st, 'รายงานผลงานรายโรงเรียน', name, 'ผลงานการแข่งขันสร้างสรรค์ผลงานคณิตศาสตร์โดยใช้โปรแกรม GSP · ปีการศึกษา ' + Object.keys(s.y).sort().join(', ')) +
+          (pi === 0 ? head(cx.st, 'รายงานผลงานรายโรงเรียน', name, 'ผลงานการแข่งขันสร้างสรรค์ผลงานคณิตศาสตร์โดยใช้โปรแกรม GSP · ปีการศึกษา ' + Object.keys(s.y).sort().join(', '), name) +
             '<div class="rp-school-top"><div class="rp-stats">' +
             '<div><b>' + rows.length + '</b><span>ผลงาน</span></div><div><b>' + s.w + '</b><span>ชนะเลิศ</span></div>' +
             '<div class="g"><b>' + s.g + '</b><span>เหรียญทอง</span></div><div class="s"><b>' + s.si + '</b><span>เหรียญเงิน</span></div><div class="b"><b>' + s.b + '</b><span>เหรียญทองแดง</span></div></div>' +
             '<div class="rp-qr-big">' + qrSvg(link) + '<div><b>สแกนเพื่อดูผลงานทั้งหมด</b><br>รูปภาพ ไฟล์ GSP และรายละเอียดผลงาน<div class="url">' + esc(link) + '</div></div></div></div>'
             : '<div class="rp-cont">' + esc(name) + ' (ต่อ)</div>') +
           '<div class="rp-works">' + part.map(function (r) {
-            var img = (r.images || [])[0];
-            return '<div class="rp-w">' + (img ? '<img alt="" src="' + esc(U.imgSrc(img, 500)) + '">' : '<div class="noimg"></div>') +
+            var img = U.coverOf(r);
+            return '<div class="rp-w">' + (img ? '<img alt="" src="' + esc(U.imgSrc(img, 500)) + '">' : '<div class="noimg logo-thumb">' + U.logoHtml(r.school, 'lg') + '</div>') +
               '<div class="tx"><div class="mt">ปีการศึกษา ' + esc(r._c.year) + ' · ' + esc(r._c.level) + ' · ' + esc(r._c.stage) + '</div>' +
-              '<h3>' + esc(U.rankLabel(r.rank)) + ' — ' + esc(r.title || '(ไม่ระบุชื่อผลงาน)') + '</h3>' +
+              '<h3>' + esc(U.rankLabel(r.rank)) + (r.title ? ' — ' + esc(r.title) : '') + '</h3>' +
               '<div class="tg">' + U.medalTag(r._m) + (r.score !== '' ? ' <span class="sc">' + esc(r.score) + ' คะแนน</span>' : '') + (r.advance ? ' <span class="adv">ตัวแทนระดับถัดไป</span>' : '') + '</div>' +
               '<div class="pp"><b>นักเรียน:</b> ' + (r.students || []).map(esc).join(', ') + '</div>' +
               ((r.coaches || []).length ? '<div class="pp"><b>ครูผู้ฝึกสอน:</b> ' + r.coaches.map(esc).join(', ') + '</div>' : '') + '</div>' +
@@ -160,7 +160,7 @@ var Report = (function () {
     for (i = 0; i < list.length; i += per) {
       out += '<section class="sheet">' + (i === 0 ? head(cx.st, 'QR Code ผลงานรายโรงเรียน', 'สแกนเพื่อดูผลงานของโรงเรียน', year ? 'ปีการศึกษา ' + esc(year) : 'ทุกปีการศึกษา') : '') +
         '<div class="rp-qrgrid">' + list.slice(i, i + per).map(function (o) {
-          return '<div class="qc">' + qrSvg(schoolLink(cx.st, o.name)) + '<div><b>' + esc(o.name) + '</b><span>' + o.n + ' ผลงาน' + (o.w ? ' · ชนะเลิศ ' + o.w : '') + '</span>' +
+          return '<div class="qc">' + qrSvg(schoolLink(cx.st, o.name)) + '<div>' + U.logoHtml(o.name, 'md') + '<b>' + esc(o.name) + '</b><span>' + o.n + ' ผลงาน' + (o.w ? ' · ชนะเลิศ ' + o.w : '') + '</span>' +
             '<span class="md"><i class="g">ทอง ' + o.g + '</i><i class="s">เงิน ' + o.s + '</i><i class="b">ทองแดง ' + o.b + '</i></span></div></div>';
         }).join('') + '</div>' + foot(cx.st, 'แผ่นที่ ' + (i / per + 1)) + '</section>';
     }
