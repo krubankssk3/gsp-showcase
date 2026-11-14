@@ -50,6 +50,7 @@
 
   function prepare(d) {
     S.settings = d.settings || {};
+    U.setSchools(d.schools || []);
     S.comps = d.competitions || [];
     S.compMap = {};
     S.comps.forEach(function (c) { S.compMap[c.id] = c; });
@@ -122,11 +123,11 @@
     var order = [top[1], top[0], top[2]];
     $('#podium').innerHTML = order.map(function (r) {
       if (!r) return '<div></div>';
-      var n = Number(r.rank), img = (r.images || [])[0];
+      var n = Number(r.rank);
       return '<article class="pod glow t' + n + ' p' + n + '" data-id="' + esc(r.id) + '"><span class="ring-b"></span>' + U.rankBadge(n) +
-        '<div class="ph">' + (img ? '<img loading="lazy" alt="' + esc(r.title) + '" src="' + esc(U.imgSrc(img, 800)) + '">' : '') + '</div>' +
+        '<div class="ph">' + U.thumbHtml(r, 800) + (hasGsp(r) ? '<span class="gsp-chip">' + ICON('file') + 'GSP</span>' : '') + '</div>' +
         '<div class="step"></div><div class="pb"><div class="pod-label">' + esc(U.rankLabel(n)) + '</div>' +
-        '<h3>' + esc(r.title || '-') + '</h3><div class="sch">' + esc(r.school) + '</div>' +
+        U.schoolHead(r) +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">' + U.medalTag(r._m) +
         (r.score !== '' && r.score !== undefined ? '<span class="tag gray">' + esc(r.score) + ' คะแนน</span>' : '') +
         (r.advance ? '<span class="tag green">' + ICON('flag') + ' ตัวแทน</span>' : '') + '</div></div></article>';
@@ -181,13 +182,13 @@
   function hasGsp(r) { return (r.files || []).some(function (f) { return U.isGsp(f.name); }); }
   /* ---------- ทำเนียบผลงาน ---------- */
   function cardHtml(r) {
-    var img = (r.images || [])[0], c = r._c, n = Number(r.rank), top = n <= 3;
+    var c = r._c, n = Number(r.rank), top = n <= 3;
     return '<article class="card glow' + (top ? ' t' + n : '') + '" data-id="' + esc(r.id) + '">' + (top ? '<span class="ring-b"></span>' : '') +
-      '<div class="thumb">' + (img ? '<img loading="lazy" alt="' + esc(r.title) + '" src="' + esc(U.imgSrc(img, 600)) + '">' : '') +
+      '<div class="thumb">' + U.thumbHtml(r, 600) +
       (hasGsp(r) ? '<span class="gsp-chip">' + ICON('file') + 'GSP</span>' : '') +
       U.rankBadge(r.rank) + '<div class="badges">' + U.medalTag(r._m) + '</div></div>' +
       '<div class="body"><div class="meta"><span class="mono">' + esc(c.year) + '</span>·<span>' + esc(c.level) + '</span>·<span>' + esc(U.rankLabel(r.rank)) + '</span></div>' +
-      '<h3>' + esc(r.title || '(ไม่ระบุชื่อผลงาน)') + '</h3><div class="sch">' + esc(r.school) + '</div>' +
+      U.schoolHead(r) +
       '<div class="foot"><span>' + ICON('users') + (r.students || []).length + ' คน</span><span>' + ICON('eye') + (r.views || 0) + '</span><span>' + ICON('dl') + (r.downloads || 0) + '</span></div>' +
       '</div></article>';
   }
@@ -224,7 +225,8 @@
   function fileRow(f, rid) {
     var g = U.isGsp(f.name), pdf = U.ext(f.name) === 'pdf';
     return '<a class="file' + (g ? ' gspf' : '') + '" href="' + esc(pdf ? U.viewUrl(f) : U.dlUrl(f)) + '" target="_blank" rel="noopener" data-dl="' + esc(rid || '') + '"' + (g ? ' title="ไฟล์โปรแกรม The Geometer\'s Sketchpad"' : '') + '>' +
-      '<span class="ext ' + U.extCls(f.name) + '">' + esc(U.ext(f.name).slice(0, 4)) + '</span>' +
+      (g && f.preview ? '<span class="ext pvx"><img alt="" src="' + esc(U.imgSrc(f.preview, 200)) + '"><i>GSP</i></span>' :
+        '<span class="ext ' + U.extCls(f.name) + '">' + esc(U.ext(f.name).slice(0, 4)) + '</span>') +
       '<span class="fn"><b>' + esc(f.name) + '</b><small>' + esc(f.kind || 'ไฟล์') + (f.size ? ' · ' + U.fmtSize(f.size) : '') +
       (g ? ' · เปิดด้วยโปรแกรม GSP' : '') + (pdf ? ' · คลิกเพื่อเปิดดู' : '') + '</small></span>' + ICON(pdf ? 'eye' : 'dl') + '</a>';
   }
@@ -362,14 +364,14 @@
     $$('#yearOut [data-id]').forEach(function (el) { el.onclick = function () { openWork(el.getAttribute('data-id')); }; });
   }
   function levelCard(l) {
-    var c = l.comp, ch = l.champion, M = l.medals, tot = l.teams || 1, img = ch && (ch.images || [])[0];
+    var c = l.comp, ch = l.champion, M = l.medals, tot = l.teams || 1, img = ch && U.coverOf(ch);
     function seg(v, col) { return v ? '<span style="width:' + (v / tot * 100) + '%;background:' + col + ';box-shadow:0 0 8px ' + col + '"></span>' : ''; }
     var lo = l.min === null ? 50 : Math.max(0, Math.floor(l.min / 10) * 10 - (l.min % 10 < 3 ? 10 : 0));
     var st = S.settings;
     return '<div class="bp-card glow"><h3>ระดับชั้น ' + esc(c.level) + ' <span class="m">' + esc(c.stage) + '</span></h3>' +
       '<div class="sub">' + U.fmtDate(c.date) + (c.venue ? ' · ' + esc(c.venue) : '') + ' · ' + l.teams + ' ทีม · ' + l.schoolCount + ' โรงเรียน · ' + l.students + ' คน</div>' +
-      (ch ? '<div class="champ glow t1" data-id="' + esc(ch.id) + '"><span class="ring-b"></span>' + (img ? '<img alt="" src="' + esc(U.imgSrc(img, 400)) + '">' : '<div></div>') +
-        '<div><div class="lbl">🏆 ' + esc(U.rankLabel(ch.rank)) + (ch.score !== '' ? ' · ' + esc(ch.score) + ' คะแนน' : '') + '</div><h4>' + esc(ch.title || '-') + '</h4><p>' + esc(ch.school) + '</p>' +
+      (ch ? '<div class="champ glow t1" data-id="' + esc(ch.id) + '"><span class="ring-b"></span>' + (img ? '<img alt="" src="' + esc(U.imgSrc(img, 400)) + '">' : '<div class="logo-thumb dark">' + U.logoHtml(ch.school, 'lg') + '</div>') +
+        '<div><div class="lbl">🏆 ' + esc(U.rankLabel(ch.rank)) + (ch.score !== '' ? ' · ' + esc(ch.score) + ' คะแนน' : '') + '</div><h4 class="sch-h">' + U.logoHtml(ch.school, 'sm') + '<span>' + esc(ch.school) + '</span></h4>' + (ch.title ? '<p>' + esc(ch.title) + '</p>' : '') +
         '<p style="color:#8d99b8;font-size:12px">' + (ch.students || []).map(esc).join(', ') + '</p></div></div>' : '') +
       '<div class="medal-strip">' + seg(M['ทอง'], CC.gold) + seg(M['เงิน'], CC.silver) + seg(M['ทองแดง'], CC.bronze) + seg(M['เข้าร่วม'], CC.none) + '</div>' +
       '<div class="legend-d" style="font-size:12px"><span><i style="background:' + CC.gold + ';color:' + CC.gold + '"></i>ทอง ' + M['ทอง'] + '</span><span><i style="background:' + CC.silver + ';color:' + CC.silver + '"></i>เงิน ' + M['เงิน'] + '</span><span><i style="background:' + CC.bronze + ';color:' + CC.bronze + '"></i>ทองแดง ' + M['ทองแดง'] + '</span>' +
@@ -381,7 +383,7 @@
         { from: Number(st.silverMin || 70), to: Number(st.goldMin || 80), color: CC.silver },
         { from: Number(st.goldMin || 80), to: 100, color: CC.gold }] }) + '</div>' : '') +
       '<div class="top-list">' + l.rows.slice(1, 5).map(function (r) {
-        return '<div class="it" data-id="' + esc(r.id) + '">' + U.rankBadge(r.rank) + '<span>' + esc(r.school) + ' <span class="muted">· ' + esc(r.title || '') + '</span></span><span class="sc">' + esc(r.score) + '</span></div>';
+        return '<div class="it" data-id="' + esc(r.id) + '">' + U.rankBadge(r.rank) + U.logoHtml(r.school, 'xs') + '<span>' + esc(r.school) + (r.title ? ' <span class="muted">· ' + esc(r.title) + '</span>' : '') + '</span><span class="sc">' + esc(r.score) + '</span></div>';
       }).join('') + (l.rows.length > 5 ? '<div class="muted" style="font-size:12.5px;padding-left:6px">และอีก ' + (l.rows.length - 5) + ' ทีม</div>' : '') + '</div>' +
       (l.advance.length ? '<div class="adv"><span class="muted" style="font-size:12.5px">ตัวแทนระดับถัดไป:</span>' + l.advance.map(function (r) { return '<span class="tag">' + ICON('flag') + esc(r.school) + '</span>'; }).join('') + '</div>' : '') +
       '</div>';
@@ -423,13 +425,13 @@
       if (r._m === 'ทอง') st.g++; else if (r._m === 'เงิน') st.s++; else if (r._m === 'ทองแดง') st.b++;
     });
     var link = Report.schoolLink(S.settings, name);
-    $('#modalRoot').innerHTML = '<div class="modal-bg" id="mbg"><div class="modal"><div class="modal-head">' + ICON('flag') + '<h3>ผลงานของ' + esc(name) + '</h3>' +
+    $('#modalRoot').innerHTML = '<div class="modal-bg" id="mbg"><div class="modal"><div class="modal-head">' + U.logoHtml(name, 'sm') + '<h3>ผลงานของ' + esc(name) + '</h3>' +
       '<button class="icon-btn" id="mClose" title="ปิด">' + ICON('x') + '</button></div><div class="modal-body">' +
       '<div class="school-top"><div class="school-stats">' +
       '<div class="stat"><b>' + rows.length + '</b><span>ผลงาน</span></div><div class="stat"><b>' + st.w + '</b><span>ชนะเลิศ</span></div>' +
       '<div class="stat"><b style="color:#9a7408">' + st.g + '</b><span>เหรียญทอง</span></div><div class="stat"><b style="color:#5d6a80">' + st.s + '</b><span>เหรียญเงิน</span></div>' +
       '<div class="stat"><b style="color:var(--bronze)">' + st.b + '</b><span>เหรียญทองแดง</span></div><div class="stat"><b>' + st.stu + '</b><span>นักเรียน</span></div></div>' +
-      '<div class="school-qr"><div class="qr-inline">' + Report.qrSvg(link) + '</div><div><b>QR Code ของโรงเรียน</b><div class="muted" style="font-size:12.5px">ปีการศึกษา ' + Object.keys(st.y).sort().join(', ') + '</div>' +
+      '<div class="school-qr">' + U.logoHtml(name, 'lg') + '<div class="qr-inline">' + Report.qrSvg(link) + '</div><div><b>QR Code ของโรงเรียน</b><div class="muted" style="font-size:12.5px">ปีการศึกษา ' + Object.keys(st.y).sort().join(', ') + '</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-sm" id="sCopy">' + ICON('link') + 'คัดลอกลิงก์</button>' +
       '<button class="btn btn-sm btn-primary" id="sPrint">' + ICON('dl') + 'รายงาน PDF</button></div></div></div></div>' +
       '<div class="cards" style="margin-top:18px">' + rows.map(cardHtml).join('') + '</div></div></div></div>';
@@ -461,19 +463,21 @@
     }
   }
   function stepImg(d) {
-    var n = (S.cur.images || []).length;
+    var n = U.gallery(S.cur).length;
     if (n < 2) return;
     S.imgIdx = (S.imgIdx + d + n) % n;
     paintGallery();
   }
   function paintGallery() {
-    var imgs = S.cur.images || [], m = $('#gMain');
+    var imgs = U.gallery(S.cur), m = $('#gMain');
     if (!m) return;
-    m.innerHTML = imgs.length ? '<img alt="" src="' + esc(U.imgSrc(imgs[S.imgIdx], 1600)) + '">' : '<span class="muted">ไม่มีรูปภาพ</span>';
+    var im = imgs[S.imgIdx];
+    m.innerHTML = imgs.length ? '<img alt="" src="' + esc(U.imgSrc(im, 1600)) + '">' + (im._gsp ? '<span class="g-cap">' + ICON('file') + 'ภาพตัวอย่างไฟล์ ' + esc(im._gsp) + '</span>' : '') :
+      '<div class="logo-thumb dark">' + U.logoHtml(S.cur.school, 'xxl') + '</div>';
     $$('#gThumbs img').forEach(function (t, i) { t.classList.toggle('on', i === S.imgIdx); });
   }
   function renderModal() {
-    var r = S.cur, c = r._c, imgs = r.images || [];
+    var r = S.cur, c = r._c, imgs = U.gallery(r);
     var idx = S.list.indexOf(r);
     var link = location.href.split('#')[0] + '#w-' + r.id;
     var html = '<div class="modal-bg" id="mbg"><div class="modal">' +
@@ -486,8 +490,10 @@
       '</div><div class="work-info">' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap">' + U.medalTag(r._m) + (r.score !== '' && r.score !== undefined ? '<span class="tag gray">' + esc(r.score) + ' คะแนน</span>' : '') +
       (r.advance ? '<span class="tag green">' + ICON('flag') + ' ได้เป็นตัวแทนแข่งขันระดับถัดไป</span>' : '') + '</div>' +
-      '<h2>' + esc(r.title || '(ไม่ระบุชื่อผลงาน)') + '</h2>' +
-      '<dl class="kv"><dt>โรงเรียน</dt><dd><a href="#" id="schLink">' + esc(r.school) + '</a> <span class="muted" style="font-size:12px">(ดูผลงานทั้งหมดของโรงเรียน)</span></dd>' +
+      '<h2 class="sch-h big">' + U.logoHtml(r.school, 'md') + '<span>' + esc(r.school) + '</span></h2>' +
+      (r.title ? '<div class="wt" style="font-size:15px;margin-top:-6px">ผลงาน: ' + esc(r.title) + '</div>' : '') +
+      '<div><a href="#" id="schLink" style="font-size:13.5px">' + ICON('flag') + ' ดูผลงานทั้งหมดของโรงเรียนนี้</a></div>' +
+      '<dl class="kv">' +
       '<dt>นักเรียน</dt><dd><ul>' + (r.students || []).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul></dd>' +
       '<dt>ครูผู้ฝึกสอน</dt><dd><ul>' + (r.coaches || []).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul></dd>' +
       '<dt>การแข่งขัน</dt><dd>' + esc(c.stage) + '<br><span class="muted">' + U.fmtDate(c.date) + (c.venue ? ' · ' + esc(c.venue) : '') + '</span></dd>' +
