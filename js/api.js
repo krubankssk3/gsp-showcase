@@ -220,6 +220,66 @@ var U = (function () {
   };
 })();
 
+
+/* ---------------- Pager: ระบบแบ่งหน้า (ใช้ร่วมทุกหน้า) ----------------
+   var pg = Pager('works', 12, [12, 24, 48]);
+   list = pg.slice(all);  html += pg.html(all.length);  pg.bind(root, render);
+   จำจำนวนต่อหน้าที่ผู้ใช้เลือกไว้ในเบราว์เซอร์ */
+function Pager(id, size, sizes, o) {
+  'use strict';
+  o = o || {};
+  var saved = Number(U.store('pg_' + id));
+  var st = { id: id, page: 1, size: saved || size, sizes: sizes || [size, size * 2, size * 4], total: 0 };
+  function pages() { return st.size > 0 ? Math.max(1, Math.ceil(st.total / st.size)) : 1; }
+  st.reset = function () { st.page = 1; return st; };
+  st.slice = function (arr) {
+    st.total = arr.length;
+    if (st.page > pages()) st.page = pages();
+    if (st.page < 1) st.page = 1;
+    if (st.size <= 0) return arr.slice();
+    return arr.slice((st.page - 1) * st.size, st.page * st.size);
+  };
+  st.html = function (total, unit) {
+    if (total !== undefined) st.total = total;
+    if (!st.total) return '';
+    var n = pages(), p = st.page, from = st.size > 0 ? (p - 1) * st.size + 1 : 1, to = st.size > 0 ? Math.min(st.total, p * st.size) : st.total;
+    if (st.total <= Math.min.apply(null, st.sizes) && !o.always) {
+      return '<div class="pager mini" data-pager="' + id + '"><span class="pg-info">ทั้งหมด ' + st.total + ' ' + (unit || 'รายการ') + '</span></div>';
+    }
+    var nums = [], i;
+    for (i = 1; i <= n; i++) {
+      if (i === 1 || i === n || Math.abs(i - p) <= 1) nums.push(i);
+      else if (nums[nums.length - 1] !== '…') nums.push('…');
+    }
+    function b(label, to2, dis, on, title) {
+      return '<button type="button" class="pg-b' + (on ? ' on' : '') + '" data-pg="' + to2 + '"' + (dis ? ' disabled' : '') + (title ? ' title="' + title + '"' : '') + '>' + label + '</button>';
+    }
+    return '<div class="pager" data-pager="' + id + '">' +
+      '<span class="pg-info">แสดง <b>' + from + '–' + to + '</b> จาก <b>' + st.total + '</b> ' + (unit || 'รายการ') + '</span>' +
+      '<span class="pg-nav">' + b('«', 1, p === 1, false, 'หน้าแรก') + b('‹', p - 1, p === 1, false, 'ก่อนหน้า') +
+      nums.map(function (x) { return x === '…' ? '<span class="pg-gap">…</span>' : b(x, x, false, x === p); }).join('') +
+      b('›', p + 1, p === n, false, 'ถัดไป') + b('»', n, p === n, false, 'หน้าสุดท้าย') + '</span>' +
+      '<label class="pg-size">ต่อหน้า <select data-pgsize>' + st.sizes.map(function (z) {
+        return '<option value="' + z + '"' + (z === st.size ? ' selected' : '') + '>' + z + '</option>';
+      }).join('') + '<option value="0"' + (st.size === 0 ? ' selected' : '') + '>ทั้งหมด</option></select></label></div>';
+  };
+  st.bind = function (root, render, scrollEl) {
+    U.$$('[data-pager="' + id + '"]', root || document).forEach(function (box) {
+      U.$$('[data-pg]', box).forEach(function (btn) {
+        btn.onclick = function () {
+          st.page = Number(btn.getAttribute('data-pg')); render();
+          var t = typeof scrollEl === 'function' ? scrollEl() : scrollEl;
+          if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start' });
+        };
+      });
+      var sel = U.$('[data-pgsize]', box);
+      if (sel) sel.onchange = function () { st.size = Number(sel.value); st.page = 1; U.store('pg_' + id, st.size || -1); render(); };
+    });
+  };
+  if (saved === -1) st.size = 0;
+  return st;
+}
+
 /* ---------------- ICON ---------------- */
 var ICON = (function () {
   var P = {
