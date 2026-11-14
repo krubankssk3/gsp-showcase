@@ -7,6 +7,15 @@
   var DB = null, CM = {};
   var VIEW = 'dash';
   var RF = { comp: '', q: '' };
+  var PG = {
+    results: Pager('a_results', 20, [20, 50, 100]),
+    comps: Pager('a_comps', 10, [10, 20, 50]),
+    schools: Pager('a_schools', 24, [24, 48, 96]),
+    links: Pager('a_links', 15, [15, 30, 60]),
+    todo: Pager('a_todo', 8, [8, 16, 32]),
+    logs: Pager('a_logs', 10, [10, 25, 50]),
+    imp: Pager('a_import', 50, [50, 100, 200])
+  };
   var NAV = {
     dash: ['home', 'แดชบอร์ด'],
     comps: ['calendar', 'รายการแข่งขัน / โจทย์'],
@@ -316,27 +325,42 @@
           '</td><td>' + y.gsp + '</td><td>' + y.views + '</td></tr>';
       }).join('') + '</tbody></table></div></div></div>' +
       '<div class="stat-grid"><div class="panel glow"><h3>รายการที่ควรเติมข้อมูล <span class="tag ' + (todo.length ? 'red' : 'green') + '">' + todo.length + '</span></h3>' +
-      (todo.length ? '<div>' + todo.slice(0, 8).map(function (t, i) {
-        return '<div class="log" style="align-items:center"><div style="flex:1"><b style="font-weight:600">' + esc(t.t) + '</b><br><span class="muted">' + esc(t.d) + '</span></div><button class="btn btn-sm" data-todo="' + i + '">จัดการ</button></div>';
-      }).join('') + (todo.length > 8 ? '<div class="muted" style="font-size:13px;padding-top:8px">และอีก ' + (todo.length - 8) + ' รายการ</div>' : '') + '</div>' :
-        '<div class="empty">ข้อมูลครบถ้วนแล้ว 🎉</div>') + '</div>' +
+      '<div id="todoBox"></div></div>' +
       '<div class="panel"><h3>ผลงานที่มีผู้เข้าชมมากที่สุด</h3>' + top.map(function (r) {
-        return '<div class="log" style="align-items:center">' + U.rankBadge(r.rank) + '<div style="flex:1;min-width:0"><b style="font-weight:600">' + esc(r.school) + '</b><br><span class="muted">' + esc(r.school) + '</span></div><span class="mono">' + (r.views || 0) + '</span></div>';
+        return '<div class="log" style="align-items:center">' + U.rankBadge(r.rank) + '<div style="flex:1;min-width:0"><b style="font-weight:600">' + esc(r.school) + '</b><br><span class="muted">' + esc(compLabel(CM[r.competitionId])) + '</span></div><span class="mono">' + (r.views || 0) + '</span></div>';
       }).join('') + '</div></div>' +
-      '<div class="panel" style="margin-top:18px"><h3>ประวัติการทำงานล่าสุด</h3>' + (DB.logs || []).slice(0, 10).map(function (l) {
-        return '<div class="log"><time>' + esc(U.fmtDateTime(l.at)) + '</time><span>' + esc(l.detail) + '</span></div>';
-      }).join('') + '</div>';
+      '<div class="panel" style="margin-top:18px"><h3>ประวัติการทำงานล่าสุด</h3><div id="logBox"></div></div>';
     $('#dAddC').onclick = function () { compForm(null); };
     $('#dAddR').onclick = function () { resultForm(null, RF.comp || (DB.competitions[0] || {}).id); };
-    $$('[data-todo]').forEach(function (b) {
-      b.onclick = function () {
-        var t = todo[Number(b.getAttribute('data-todo'))];
-        if (t.act === 'comp') compForm(CM[t.id]);
-        else if (t.act === 'res') { RF.comp = t.id; go('results'); }
-        else if (t.act === 'schools') go('schools');
-        else resultForm(findResult(t.id));
-      };
-    });
+    function paintTodo() {
+      var box = $('#todoBox');
+      if (!box) return;
+      if (!todo.length) { box.innerHTML = '<div class="empty">ข้อมูลครบถ้วนแล้ว 🎉</div>'; return; }
+      var part = PG.todo.slice(todo);
+      box.innerHTML = '<div>' + part.map(function (t) {
+        var i = todo.indexOf(t);
+        return '<div class="log" style="align-items:center"><div style="flex:1"><b style="font-weight:600">' + esc(t.t) + '</b><br><span class="muted">' + esc(t.d) + '</span></div><button class="btn btn-sm" data-todo="' + i + '">จัดการ</button></div>';
+      }).join('') + '</div>' + PG.todo.html(todo.length);
+      PG.todo.bind(box, paintTodo);
+      $$('[data-todo]', box).forEach(function (b) {
+        b.onclick = function () {
+          var t = todo[Number(b.getAttribute('data-todo'))];
+          if (t.act === 'comp') compForm(CM[t.id]);
+          else if (t.act === 'res') { RF.comp = t.id; go('results'); }
+          else if (t.act === 'schools') go('schools');
+          else resultForm(findResult(t.id));
+        };
+      });
+    }
+    function paintLogs() {
+      var box = $('#logBox'), logs = DB.logs || [];
+      if (!box) return;
+      box.innerHTML = PG.logs.slice(logs).map(function (l) {
+        return '<div class="log"><time>' + esc(U.fmtDateTime(l.at)) + '</time><span>' + esc(l.detail) + '</span></div>';
+      }).join('') + PG.logs.html(logs.length);
+      PG.logs.bind(box, paintLogs);
+    }
+    paintTodo(); paintLogs();
   }
   function uniqYears() { var o = {}; DB.competitions.forEach(function (c) { o[c.year] = 1; }); return Object.keys(o); }
   function findResult(id) { var r = null; DB.results.forEach(function (x) { if (x.id === id) r = x; }); return r; }
@@ -344,7 +368,7 @@
   /* ================= รายการแข่งขัน ================= */
   function viewComps() {
     var byYear = {}, ys = [];
-    DB.competitions.forEach(function (c) { if (!byYear[c.year]) { byYear[c.year] = []; ys.push(c.year); } byYear[c.year].push(c); });
+    PG.comps.slice(DB.competitions).forEach(function (c) { if (!byYear[c.year]) { byYear[c.year] = []; ys.push(c.year); } byYear[c.year].push(c); });
     $('#view').innerHTML = pageHead('รายการแข่งขัน / โจทย์', 'แต่ละปีการศึกษา แยกตามระดับชั้นและระดับการแข่งขัน พร้อมไฟล์โจทย์ให้ดาวน์โหลด',
       '<button class="btn btn-primary" id="cAdd">' + ICON('plus') + 'เพิ่มรายการแข่งขัน</button>') +
       (ys.length ? ys.map(function (y) {
@@ -357,7 +381,8 @@
               '<button class="icon-btn" data-edit="' + esc(c.id) + '" title="แก้ไข">' + ICON('edit') + '</button>' +
               '<button class="icon-btn btn-danger" data-del="' + esc(c.id) + '" title="ลบ">' + ICON('trash') + '</button></div></td></tr>';
           }).join('') + '</tbody></table></div></div>';
-      }).join('') : '<div class="empty">ยังไม่มีรายการแข่งขัน — เริ่มจากเพิ่มรายการของปีการศึกษาแรก</div>');
+      }).join('') + PG.comps.html(DB.competitions.length, 'รายการ') : '<div class="empty">ยังไม่มีรายการแข่งขัน — เริ่มจากเพิ่มรายการของปีการศึกษาแรก</div>');
+    PG.comps.bind($('#view'), viewComps);
     $('#cAdd').onclick = function () { compForm(null); };
     bindSwitches($('#view'));
     $$('[data-edit]').forEach(function (b) { b.onclick = function () { compForm(CM[b.getAttribute('data-edit')]); }; });
@@ -440,9 +465,9 @@
       '<div class="search">' + ICON('search') + '<input class="input" id="rQ" placeholder="ค้นหาชื่อผลงาน โรงเรียน นักเรียน" value="' + esc(RF.q) + '"></div>' +
       '<span id="rTools" style="display:flex;gap:8px;flex-wrap:wrap"></span></div>' +
       '<div class="panel" style="padding:0;overflow:hidden" id="rTable"></div>';
-    $('#rComp').onchange = function () { RF.comp = this.value; paintResults(); };
+    $('#rComp').onchange = function () { RF.comp = this.value; PG.results.reset(); paintResults(); };
     var t = null;
-    $('#rQ').oninput = function () { var v = this.value; clearTimeout(t); t = setTimeout(function () { RF.q = v.trim(); paintResults(); }, 200); };
+    $('#rQ').oninput = function () { var v = this.value; clearTimeout(t); t = setTimeout(function () { RF.q = v.trim(); PG.results.reset(); paintResults(); }, 200); };
     $('#rAdd').onclick = function () { resultForm(null, RF.comp || (DB.competitions[0] || {}).id); };
     $('#rImport').onclick = function () { go('import'); };
     paintResults();
@@ -520,6 +545,8 @@
     }
     var ranks = {}, dupes = {};
     list.forEach(function (r) { var k = r.competitionId + '_' + r.rank; if (ranks[k]) dupes[k] = 1; ranks[k] = 1; });
+    var total = list.length;
+    list = PG.results.slice(list);
     $('#rTable').innerHTML = '<div class="tbl-wrap"><table class="tbl"><thead><tr><th></th><th>อันดับ</th><th>ผลงาน / โรงเรียน</th>' + (RF.comp ? '' : '<th>รายการ</th>') +
       '<th>นักเรียน</th><th>คะแนน</th><th>เหรียญ</th><th>ไฟล์</th><th>' + ICON('eye') + '</th><th>เผยแพร่</th><th></th></tr></thead><tbody>' +
       list.map(function (r) {
@@ -535,7 +562,8 @@
           '<td class="mono muted">' + (r.views || 0) + '</td><td>' + switchHtml('result', r.id, r.published) + '</td>' +
           '<td><div class="row-actions"><button class="icon-btn" data-edit="' + esc(r.id) + '" title="แก้ไข">' + ICON('edit') + '</button>' +
           '<button class="icon-btn btn-danger" data-del="' + esc(r.id) + '" title="ลบ">' + ICON('trash') + '</button></div></td></tr>';
-      }).join('') + '</tbody></table></div>';
+      }).join('') + '</tbody></table></div>' + PG.results.html(total, 'ผลงาน');
+    PG.results.bind($('#rTable'), paintResults, function () { return $('#rTable'); });
     bindSwitches($('#rTable'));
     $$('#rTable [data-edit]').forEach(function (b) { b.onclick = function () { resultForm(findResult(b.getAttribute('data-edit'))); }; });
     $$('#rTable [data-del]').forEach(function (b) {
@@ -657,7 +685,7 @@
       '<div id="iPreview" style="margin-top:18px"></div>';
     if (!DB.competitions.length) { $('#iPreview').innerHTML = '<div class="empty">ต้องเพิ่มรายการแข่งขันก่อนจึงจะนำเข้าได้</div>'; }
     $('#iSample').onclick = function () { $('#iText').value = SAMPLE; };
-    $('#iParse').onclick = function () { parsed = parseTSV($('#iText').value); paintPreview(); };
+    $('#iParse').onclick = function () { parsed = parseTSV($('#iText').value); PG.imp.reset(); paintPreview(); };
   }
   function parseTSV(txt) {
     var rows = [];
@@ -686,14 +714,16 @@
     if (!parsed.length) { $('#iPreview').innerHTML = '<div class="empty">ไม่พบข้อมูลที่อ่านได้</div>'; return; }
     var bad = parsed.filter(function (r) { return r._err.length; }).length;
     function td(r, k, v) { return '<td' + (r._err.indexOf(k) > -1 ? ' class="bad"' : '') + '>' + v + '</td>'; }
+    var shown = PG.imp.slice(parsed);
     $('#iPreview').innerHTML = '<div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl preview-tbl"><thead><tr><th>อันดับ</th><th>โรงเรียน</th><th>นักเรียน</th><th>ครูผู้ฝึกสอน</th><th>คะแนน</th><th>เหรียญ</th><th>ชื่อผลงาน</th></tr></thead><tbody>' +
-      parsed.map(function (r) {
+      shown.map(function (r) {
         return '<tr>' + td(r, 'rank', U.rankBadge(r.rank || '?')) + td(r, 'school', esc(r.school)) + td(r, 'students', r.students.map(esc).join('<br>')) +
           '<td>' + r.coaches.map(esc).join('<br>') + '</td>' + td(r, 'score', esc(r.score)) + '<td>' + U.medalTag(U.medalAuto(r.score, DB.settings)) + '</td><td>' + esc(r.title) + '</td></tr>';
-      }).join('') + '</tbody></table></div></div>' +
+      }).join('') + '</tbody></table></div>' + PG.imp.html(parsed.length, 'แถว') + '</div>' +
       '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">' +
       (bad ? '<span class="tag red">มี ' + bad + ' แถวที่ข้อมูลไม่ครบ (ช่องสีแดง) — แก้ไขแล้วตรวจสอบใหม่</span>' : '<span class="tag green">ข้อมูลถูกต้อง ' + parsed.length + ' แถว</span>') +
       '<button class="btn btn-primary" id="iGo"' + (bad ? ' disabled' : '') + '>นำเข้า ' + parsed.length + ' รายการ</button></div>';
+    PG.imp.bind($('#iPreview'), paintPreview);
     if ($('#iGo')) $('#iGo').onclick = function () {
       var btn = this, cid = $('#iComp').value;
       var rows = parsed.map(function (r) { var o = U.clone(r); delete o._err; return o; });
@@ -773,15 +803,18 @@
         '<button class="btn btn-primary" id="migBtn">ย้ายเป็นโลโก้โรงเรียน</button></div>' : '') +
       '<div class="toolbar"><div class="search">' + ICON('search') + '<input class="input" id="schQ" placeholder="ค้นหาโรงเรียน"></div>' +
       '<span class="tag ' + (noLogo ? 'red' : 'green') + '">' + list.length + ' โรงเรียน · ยังไม่มีโลโก้ ' + noLogo + '</span></div>' +
-      '<div class="logo-grid" id="schGrid"></div>';
+      '<div class="logo-grid" id="schGrid"></div><div id="schPager"></div>';
     function paint() {
       var q = U.normSchool($('#schQ').value);
-      $('#schGrid').innerHTML = list.filter(function (o) { return !q || U.normSchool(o.name).indexOf(q) > -1; }).map(function (o, i) {
+      var found = list.filter(function (o) { return !q || U.normSchool(o.name).indexOf(q) > -1; });
+      $('#schGrid').innerHTML = PG.schools.slice(found).map(function (o, i) {
         o.logo = U.logoOf(o.name);
         return '<div class="logo-card glow' + (o.logo ? '' : ' missing') + '">' + U.logoHtml(o.name, 'xl') + '<b>' + esc(o.name) + '</b><span class="muted">' + o.n + ' ผลงาน</span>' +
           '<div class="row-actions" style="justify-content:center"><button class="btn btn-sm" data-up="' + esc(o.name) + '">' + ICON('upload') + (o.logo ? 'เปลี่ยน' : 'อัปโหลดโลโก้') + '</button>' +
           (o.logo ? '<button class="icon-btn btn-danger" data-rm="' + esc(o.name) + '" title="ลบโลโก้">' + ICON('trash') + '</button>' : '') + '</div></div>';
       }).join('') || '<div class="empty">ยังไม่มีโรงเรียน</div>';
+      $('#schPager').innerHTML = PG.schools.html(found.length, 'โรงเรียน');
+      PG.schools.bind($('#schPager'), paint);
       $$('#schGrid [data-up]').forEach(function (b) { b.onclick = function () { var n = b.getAttribute('data-up'); pickImage(function (f) { uploadLogo(n, f).then(paint, function () {}); }); }; });
       $$('#schGrid [data-rm]').forEach(function (b) {
         b.onclick = function () {
@@ -792,7 +825,7 @@
         };
       });
     }
-    $('#schQ').oninput = paint;
+    $('#schQ').oninput = function () { PG.schools.reset(); paint(); };
     if ($('#migBtn')) $('#migBtn').onclick = function () {
       confirmBox('ย้ายภาพแรกของผลงาน ' + withImg + ' รายการไปเป็นโลโก้โรงเรียน?<br><span class="muted">โรงเรียนที่มีโลโก้อยู่แล้วจะไม่ถูกแทนที่</span>', 'ย้ายเลย').then(function (ok) {
         if (!ok) return;
@@ -831,10 +864,12 @@
         '<button class="btn btn-primary" id="rpP">สร้างโปสเตอร์</button>') + '</div>' +
       '<div class="panel" style="margin-top:18px"><h3>ลิงก์และ QR รายโรงเรียน <span class="tag gray">' + schools.length + ' โรงเรียน</span></h3>' +
       '<p class="muted" style="margin:-6px 0 12px;font-size:13.5px">คัดลอกลิงก์ส่งให้โรงเรียนทาง LINE ได้ทันที</p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>QR</th><th>โรงเรียน</th><th>ผลงาน</th><th>ชนะเลิศ</th><th>ทอง / เงิน / ทองแดง</th><th></th></tr></thead><tbody>' +
-      schools.map(function (o, i) {
+      PG.links.slice(schools).map(function (o) {
+        var i = schools.indexOf(o);
         return '<tr><td><div style="width:54px">' + Report.qrSvg(Report.schoolLink(DB.settings, o.name)) + '</div></td><td><b style="font-weight:600">' + esc(o.name) + '</b><br><span class="mono muted" style="font-size:11px">#s-' + Report.schoolCode(o.name) + '</span></td><td>' + o.n + '</td><td>' + o.w +
           '</td><td class="mono">' + o.g + ' / ' + o.s + ' / ' + o.b + '</td><td><div class="row-actions"><button class="btn btn-sm" data-cp="' + i + '">' + ICON('link') + 'คัดลอกลิงก์</button><button class="btn btn-sm" data-pr="' + i + '">' + ICON('file') + 'PDF</button></div></td></tr>';
-      }).join('') + '</tbody></table></div></div>';
+      }).join('') + '</tbody></table></div>' + PG.links.html(schools.length, 'โรงเรียน') + '</div>';
+    PG.links.bind($('#view'), viewReports);
     $('#rpA').onclick = function () {
       var v = $('#rpComp').value, ids = v.indexOf('y:') === 0 ? DB.competitions.filter(function (c) { return String(c.year) === v.slice(2); }).map(function (c) { return c.id; }) : [v];
       Report.open('ประกาศผลการแข่งขัน', Report.announce(all, ids));
