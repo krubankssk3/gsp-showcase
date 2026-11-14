@@ -11,6 +11,7 @@
     dash: ['home', 'แดชบอร์ด'],
     comps: ['calendar', 'รายการแข่งขัน / โจทย์'],
     results: ['trophy', 'ผลการแข่งขัน'],
+    schools: ['flag', 'โรงเรียน / โลโก้'],
     'import': ['paste', 'นำเข้าจาก Excel'],
     reports: ['file', 'รายงาน PDF / QR Code'],
     'site-config': ['gear', 'ตั้งค่าระบบ']
@@ -83,6 +84,8 @@
   function load() {
     return API.call('getAdmin').then(function (d) {
       DB = d;
+      DB.schools = DB.schools || [];
+      U.setSchools(DB.schools);
       UI.setSettings(DB.settings);
       CM = {};
       DB.competitions.sort(function (a, b) { return b.year - a.year || String(a.level).localeCompare(String(b.level)); });
@@ -102,7 +105,7 @@
     var h = location.hash.replace('#', '');
     VIEW = NAV[h] ? h : 'dash';
     $$('.side a.nv[data-v]').forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-v') === VIEW); });
-    var fn = { dash: viewDash, comps: viewComps, results: viewResults, 'import': viewImport, reports: viewReports, 'site-config': viewSettings }[VIEW];
+    var fn = { dash: viewDash, comps: viewComps, results: viewResults, 'import': viewImport, schools: viewSchools, reports: viewReports, 'site-config': viewSettings }[VIEW];
     fn();
     window.scrollTo(0, 0);
   }
@@ -167,26 +170,58 @@
 
   /* ---------- กล่องอัปโหลดไฟล์ ---------- */
   function Uploader(el, items, o) {
-    var list = (items || []).slice(), pending = 0;
+    var list = U.clone(items || []), pending = 0, armed = -1, pvInp = null;
     el.innerHTML = '<div class="drop" tabindex="0">' + ICON('upload') + ' ' + esc(o.label) +
       '<div style="font-size:12px;margin-top:2px">' + esc(o.hint || ('ลากไฟล์มาวาง หรือคลิกเพื่อเลือก · ไม่เกิน ' + CONFIG.MAX_UPLOAD_MB + ' MB/ไฟล์')) + '</div></div>' +
       '<input type="file" class="hidden"' + (o.accept ? ' accept="' + o.accept + '"' : '') + ' multiple><div class="up-list' + (o.image ? '' : ' files') + '"></div>';
     var drop = $('.drop', el), inp = $('input[type=file]', el), box = $('.up-list', el);
+    if (o.gspPreview) {
+      pvInp = document.createElement('input'); pvInp.type = 'file'; pvInp.accept = 'image/*'; pvInp.className = 'hidden';
+      el.appendChild(pvInp);
+      pvInp.onchange = function () { if (pvInp.files[0]) setPreview(armed, pvInp.files[0]); pvInp.value = ''; };
+    }
+    function setPreview(i, file) {
+      if (i < 0 || !list[i]) return false;
+      if (!/^image\//.test(file.type)) { U.toast('ภาพตัวอย่างต้องเป็นไฟล์รูปภาพ', 'err'); return true; }
+      pending++; paint();
+      var target = list[i];
+      API.upload(file, 'images', 'ภาพตัวอย่าง GSP').then(function (meta) { target.preview = meta; U.toast('เพิ่มภาพตัวอย่างไฟล์ GSP แล้ว', 'ok'); })
+        .catch(handleErr).then(function () { pending--; armed = -1; paint(); });
+      return true;
+    }
+    /* วางภาพจากคลิปบอร์ด: ลงช่องที่เลือกไว้ หรือไฟล์ GSP แรกที่ยังไม่มีภาพ */
+    function pastePreview(file) {
+      if (!o.gspPreview) return false;
+      var i = armed;
+      if (i < 0 || !list[i] || !U.isGsp(list[i].name)) {
+        i = -1;
+        list.forEach(function (f, k) { if (i < 0 && U.isGsp(f.name) && !f.preview) i = k; });
+      }
+      if (i < 0) return false;
+      return setPreview(i, file);
+    }
     function paint() {
       box.innerHTML = list.map(function (f, i) {
         if (o.image) {
-          return '<div class="up-item"><img alt="" src="' + esc(U.imgSrc(f, 300)) + '">' + (i === 0 ? '<span class="cover">ภาพปก</span>' : '') +
+          return '<div class="up-item"><img alt="" src="' + esc(U.imgSrc(f, 300)) + '">' + (i === 0 && !o.noCover ? '<span class="cover">ภาพปก</span>' : '') +
             '<button type="button" class="x" data-i="' + i + '" title="ลบ">×</button>' +
             (i > 0 ? '<button type="button" class="x" data-c="' + i + '" title="ตั้งเป็นภาพปก" style="right:32px;font-size:11px">★</button>' : '') + '</div>';
         }
         return '<div class="up-item"><div class="file' + (U.isGsp(f.name) ? ' gspf' : '') + '"><span class="ext ' + U.extCls(f.name) + '">' + esc(U.ext(f.name).slice(0, 4)) + '</span>' +
           '<span class="fn"><b>' + esc(f.name) + '</b><small>' + U.fmtSize(f.size) + (U.isGsp(f.name) ? ' · ไฟล์ The Geometer\'s Sketchpad' : '') + '</small></span>' +
           (o.kinds ? '<select class="select" style="width:auto;padding:5px 8px;font-size:13px" data-k="' + i + '">' + o.kinds.map(function (k) { return opt(k, k, f.kind); }).join('') + '</select>' : '') +
-          '<button type="button" class="x icon-btn" data-i="' + i + '" title="ลบ">' + ICON('trash') + '</button></div></div>';
+          '<button type="button" class="x icon-btn" data-i="' + i + '" title="ลบ">' + ICON('trash') + '</button></div>' +
+          (o.gspPreview && U.isGsp(f.name) ? '<div class="gpv' + (armed === i ? ' armed' : '') + '">' + (f.preview ?
+            '<img alt="" src="' + esc(U.imgSrc(f.preview, 400)) + '"><div><b>ภาพตัวอย่างไฟล์ GSP</b><span>แสดงเป็นภาพปกของผลงานบนหน้าเว็บ</span>' +
+            '<div class="gpv-a"><button type="button" class="btn btn-sm" data-pv="' + i + '">เปลี่ยนภาพ</button><button type="button" class="btn btn-sm btn-danger" data-pvx="' + i + '">ลบภาพ</button></div></div>' :
+            '<div class="gpv-empty">' + ICON('upload') + '<div><b>เพิ่มภาพตัวอย่างไฟล์ GSP 1 ภาพ</b><span>คลิกเพื่อเลือกรูป หรือกด <kbd>Ctrl</kbd>+<kbd>V</kbd> วางภาพที่คัดลอก/แคปหน้าจอ (Win+Shift+S) จากโปรแกรม GSP</span></div>' +
+            '<button type="button" class="btn btn-sm btn-blue" data-pv="' + i + '">เลือกรูป</button></div>') + '</div>' : '') + '</div>';
       }).join('') + (pending ? '<div class="up-item loading"><span><span class="spin"></span> กำลังอัปโหลด ' + pending + ' ไฟล์</span></div>' : '');
       $$('[data-i]', box).forEach(function (b) { b.onclick = function () { list.splice(Number(b.getAttribute('data-i')), 1); paint(); }; });
       $$('[data-c]', box).forEach(function (b) { b.onclick = function () { var i = Number(b.getAttribute('data-c')); list.unshift(list.splice(i, 1)[0]); paint(); }; });
       $$('[data-k]', box).forEach(function (s) { s.onchange = function () { list[Number(s.getAttribute('data-k'))].kind = s.value; }; });
+      $$('[data-pv]', box).forEach(function (b) { b.onclick = function () { armed = Number(b.getAttribute('data-pv')); pvInp.click(); }; });
+      $$('[data-pvx]', box).forEach(function (b) { b.onclick = function () { list[Number(b.getAttribute('data-pvx'))].preview = null; paint(); }; });
       if (o.onChange) o.onChange(list);
     }
     function add(files) {
@@ -205,7 +240,7 @@
     drop.ondragleave = function () { drop.classList.remove('over'); };
     drop.ondrop = function (e) { e.preventDefault(); drop.classList.remove('over'); add(e.dataTransfer.files); };
     paint();
-    return { get: function () { return list.slice(); }, pending: function () { return pending; } };
+    return { get: function () { return list.slice(); }, pending: function () { return pending; }, add: add, pastePreview: pastePreview };
   }
   function guessKind(name, kinds) {
     var n = name.toLowerCase(), e = U.ext(name);
@@ -246,8 +281,12 @@
       if (!resultsOf(c.id).length) todo.push({ t: 'ยังไม่ได้ลงผลการแข่งขัน', d: compLabel(c), act: 'res', id: c.id });
     });
     R.forEach(function (r) {
-      if (!(r.images || []).length) todo.push({ t: 'ผลงานยังไม่มีรูปภาพ', d: 'อันดับ ' + r.rank + ' · ' + r.school + ' (' + compLabel(CM[r.competitionId]) + ')', act: 'edit', id: r.id });
-      else if (!(r.files || []).length) todo.push({ t: 'ผลงานยังไม่มีไฟล์ GSP', d: 'อันดับ ' + r.rank + ' · ' + r.school + ' (' + compLabel(CM[r.competitionId]) + ')', act: 'edit', id: r.id });
+      var gs = (r.files || []).filter(function (f) { return U.isGsp(f.name); });
+      if (!gs.length) todo.push({ t: 'ผลงานยังไม่มีไฟล์ GSP', d: 'อันดับ ' + r.rank + ' · ' + r.school + ' (' + compLabel(CM[r.competitionId]) + ')', act: 'edit', id: r.id });
+      else if (gs.some(function (f) { return !f.preview; })) todo.push({ t: 'ไฟล์ GSP ยังไม่มีภาพตัวอย่าง', d: 'อันดับ ' + r.rank + ' · ' + r.school + ' (' + compLabel(CM[r.competitionId]) + ')', act: 'edit', id: r.id });
+    });
+    schoolList().forEach(function (o) {
+      if (!o.logo) todo.unshift({ t: 'โรงเรียนยังไม่มีโลโก้', d: o.name + ' (' + o.n + ' ผลงาน)', act: 'schools', id: '' });
     });
     var A = Stats.compute(DB.competitions, R, DB.settings), CC = Charts.C;
     var top = R.slice().sort(function (a, b) { return (b.views || 0) - (a.views || 0); }).slice(0, 5);
@@ -282,7 +321,7 @@
       }).join('') + (todo.length > 8 ? '<div class="muted" style="font-size:13px;padding-top:8px">และอีก ' + (todo.length - 8) + ' รายการ</div>' : '') + '</div>' :
         '<div class="empty">ข้อมูลครบถ้วนแล้ว 🎉</div>') + '</div>' +
       '<div class="panel"><h3>ผลงานที่มีผู้เข้าชมมากที่สุด</h3>' + top.map(function (r) {
-        return '<div class="log" style="align-items:center">' + U.rankBadge(r.rank) + '<div style="flex:1;min-width:0"><b style="font-weight:600">' + esc(r.title) + '</b><br><span class="muted">' + esc(r.school) + '</span></div><span class="mono">' + (r.views || 0) + '</span></div>';
+        return '<div class="log" style="align-items:center">' + U.rankBadge(r.rank) + '<div style="flex:1;min-width:0"><b style="font-weight:600">' + esc(r.school) + '</b><br><span class="muted">' + esc(r.school) + '</span></div><span class="mono">' + (r.views || 0) + '</span></div>';
       }).join('') + '</div></div>' +
       '<div class="panel" style="margin-top:18px"><h3>ประวัติการทำงานล่าสุด</h3>' + (DB.logs || []).slice(0, 10).map(function (l) {
         return '<div class="log"><time>' + esc(U.fmtDateTime(l.at)) + '</time><span>' + esc(l.detail) + '</span></div>';
@@ -294,6 +333,7 @@
         var t = todo[Number(b.getAttribute('data-todo'))];
         if (t.act === 'comp') compForm(CM[t.id]);
         else if (t.act === 'res') { RF.comp = t.id; go('results'); }
+        else if (t.act === 'schools') go('schools');
         else resultForm(findResult(t.id));
       };
     });
@@ -483,14 +523,15 @@
     $('#rTable').innerHTML = '<div class="tbl-wrap"><table class="tbl"><thead><tr><th></th><th>อันดับ</th><th>ผลงาน / โรงเรียน</th>' + (RF.comp ? '' : '<th>รายการ</th>') +
       '<th>นักเรียน</th><th>คะแนน</th><th>เหรียญ</th><th>ไฟล์</th><th>' + ICON('eye') + '</th><th>เผยแพร่</th><th></th></tr></thead><tbody>' +
       list.map(function (r) {
-        var c = CM[r.competitionId] || {}, img = (r.images || [])[0], dup = dupes[r.competitionId + '_' + r.rank];
-        return '<tr><td>' + (img ? '<img class="thumb-sm" alt="" src="' + esc(U.imgSrc(img, 200)) + '">' : '<div class="thumb-sm"></div>') + '</td>' +
+        var c = CM[r.competitionId] || {}, dup = dupes[r.competitionId + '_' + r.rank];
+        var gspN = (r.files || []).filter(function (f) { return U.isGsp(f.name); }).length, pvN = (r.files || []).filter(function (f) { return U.isGsp(f.name) && f.preview; }).length;
+        return '<tr><td>' + U.logoHtml(r.school, 'md') + '</td>' +
           '<td>' + U.rankBadge(r.rank) + (dup ? '<br><span class="tag red" title="อันดับซ้ำ">ซ้ำ</span>' : '') + '</td>' +
-          '<td><b style="font-weight:600">' + esc(r.title || '(ไม่ระบุชื่อผลงาน)') + '</b>' + (r.advance ? ' <span class="tag green">ตัวแทน</span>' : '') + '<br><span class="muted">' + esc(r.school) + '</span></td>' +
+          '<td><b style="font-weight:600">' + esc(r.school) + '</b>' + (r.advance ? ' <span class="tag green">ตัวแทน</span>' : '') + (r.title ? '<br><span class="muted">' + esc(r.title) + '</span>' : '') + '</td>' +
           (RF.comp ? '' : '<td class="muted" style="font-size:13px">' + esc(c.year) + '<br>' + esc(c.level) + '</td>') +
           '<td style="font-size:13px">' + (r.students || []).map(esc).join('<br>') + '</td>' +
           '<td class="mono">' + esc(r.score) + '</td><td>' + U.medalTag(U.medalOf(r, DB.settings)) + '</td>' +
-          '<td class="muted" style="font-size:13px">' + (r.images || []).length + ' รูป<br>' + (r.files || []).length + ' ไฟล์</td>' +
+          '<td class="muted" style="font-size:13px;white-space:nowrap">' + (gspN ? '<span class="tag" title="ไฟล์ GSP / มีภาพตัวอย่าง">GSP ' + gspN + (pvN === gspN ? ' ✓' : ' · ไม่มีภาพ ' + (gspN - pvN)) + '</span><br>' : '') + (r.files || []).length + ' ไฟล์ · ' + (r.images || []).length + ' รูป</td>' +
           '<td class="mono muted">' + (r.views || 0) + '</td><td>' + switchHtml('result', r.id, r.published) + '</td>' +
           '<td><div class="row-actions"><button class="icon-btn" data-edit="' + esc(r.id) + '" title="แก้ไข">' + ICON('edit') + '</button>' +
           '<button class="icon-btn btn-danger" data-del="' + esc(r.id) + '" title="ลบ">' + ICON('trash') + '</button></div></td></tr>';
@@ -500,7 +541,7 @@
     $$('#rTable [data-del]').forEach(function (b) {
       b.onclick = function () {
         var r = findResult(b.getAttribute('data-del'));
-        confirmBox('ลบผลงาน <b>' + esc(r.title || r.school) + '</b> (อันดับ ' + esc(r.rank) + ') ?<br><span class="muted">รูปภาพและไฟล์ที่แนบจะถูกย้ายไปถังขยะของ Drive</span>', 'ลบผลงาน', true).then(function (ok) {
+        confirmBox('ลบผลงาน <b>' + esc(r.school) + '</b> (อันดับ ' + esc(r.rank) + ') ?<br><span class="muted">รูปภาพและไฟล์ที่แนบจะถูกย้ายไปถังขยะของ Drive</span>', 'ลบผลงาน', true).then(function (ok) {
           if (!ok) return;
           UI.loading('กำลังลบผลงาน…');
           API.call('deleteResult', { id: r.id }).then(function () { UI.close(); U.toast('ลบผลงานแล้ว', 'ok'); reload(); }).catch(handleErr);
@@ -533,22 +574,31 @@
         '<div class="field"><label>เหรียญรางวัล</label><select class="select" id="fMedal">' + opt('', 'คำนวณจากคะแนน', r.medal) + ['ทอง', 'เงิน', 'ทองแดง', 'เข้าร่วม'].map(function (m) { return opt(m, m, r.medal); }).join('') + '</select><span class="hint" id="fMedalLbl"></span></div>' +
         '<div class="span-3"><label class="check"><input type="checkbox" id="fAdv"' + (r.advance ? ' checked' : '') + '> ได้เป็นตัวแทนเข้าแข่งขันระดับถัดไป</label></div>' +
         '<div class="form-sec">ผู้เข้าแข่งขัน</div>' +
-        '<div class="field span-3"><label>โรงเรียน *</label><input class="input" id="fSchool" list="dlSchools" value="' + esc(r.school || '') + '"></div>' +
+        '<div class="field span-2"><label>โรงเรียน *</label><input class="input" id="fSchool" list="dlSchools" value="' + esc(r.school || '') + '" placeholder="เช่น บ้านเหล็ก"><span class="hint">ชื่อโรงเรียนจะแสดงเป็นหัวข้อหลักของผลงาน</span></div>' +
+        '<div class="field"><label>โลโก้โรงเรียน</label><div id="fLogo"></div></div>' +
         '<div class="field"><label>นักเรียน *</label><div id="fStu"></div></div>' +
         '<div class="field span-2"><label>ครูผู้ฝึกสอน</label><div id="fCoach"></div></div>' +
         '<div class="form-sec">ผลงาน</div>' +
-        '<div class="field span-3"><label>ชื่อผลงาน</label><input class="input" id="fTitle" value="' + esc(r.title || '') + '"></div>' +
+        '<div class="field span-3"><label>ชื่อผลงาน <span class="muted" style="font-weight:400">(ไม่บังคับ — เว้นว่างได้)</span></label><input class="input" id="fTitle" value="' + esc(r.title || '') + '"></div>' +
         '<div class="field span-3"><label>คำอธิบาย / แนวคิด / ขั้นตอนการสร้าง</label><textarea class="textarea" id="fDesc">' + esc(r.description || '') + '</textarea></div>' +
-        '<div class="field span-3"><label>รูปภาพผลงาน (ภาพแรก = ภาพปก)</label><div id="fImgs"></div></div>' +
         '<div class="field span-3"><label>ไฟล์ผลงาน (.gsp, .pdf, วิดีโอ ฯลฯ)</label><div id="fFiles"></div><span class="hint" id="gspWarn"></span></div>' +
+        '<div class="field span-3"><label>รูปภาพผลงานเพิ่มเติม <span class="muted" style="font-weight:400">(ไม่บังคับ)</span></label><div id="fImgs"></div></div>' +
         '<div class="span-3"><label class="check"><input type="checkbox" id="fPub"' + (r.published ? ' checked' : '') + '> เผยแพร่บนหน้าสาธารณะ</label></div>' +
         '</form>',
       foot: '<span class="muted" style="font-size:12px;margin-right:auto">Ctrl+Enter = บันทึก</span><button class="btn" id="fCancel">ยกเลิก</button>' + (isNew ? '<button class="btn" id="fSaveNext">บันทึกและเพิ่มอันดับถัดไป</button>' : '') + '<button class="btn btn-primary" id="fSave">บันทึก</button>',
       onMount: function () {
         stuIn = MultiInput($('#fStu'), r.students, { ph: 'ชื่อ-สกุล นักเรียน', min: 2 });
         coIn = MultiInput($('#fCoach'), r.coaches, { ph: 'ชื่อ-สกุล ครูผู้ฝึกสอน', min: 2, list: 'dlCoaches' });
-        imgUp = Uploader($('#fImgs'), r.images, { label: 'อัปโหลดรูปภาพ', folder: 'images', image: true, accept: 'image/*', hint: 'ลากไฟล์มาวาง หรือคลิกเพื่อเลือก · รูปใหญ่เกิน 1.5 MB จะถูกย่ออัตโนมัติ' });
-        fileUp = Uploader($('#fFiles'), r.files, { onChange: function (l) { var w = $('#gspWarn'); if (w) w.innerHTML = l.some(function (f) { return U.isGsp(f.name); }) ? '<span style="color:var(--green)">✓ มีไฟล์ GSP แล้ว — ผู้ชมจะดาวน์โหลดไปเปิดในโปรแกรมได้</span>' : '<span style="color:#b07a00">ยังไม่มีไฟล์ .gsp — แนะนำให้แนบไฟล์ผลงานเพื่อให้ครูและนักเรียนนำไปฝึก</span>'; }, label: 'อัปโหลดไฟล์ผลงาน .gsp และเอกสารประกอบ', folder: 'files', kinds: FILE_KINDS_RES, accept: FILE_ACCEPT, hint: FILE_HINT });
+        imgUp = Uploader($('#fImgs'), r.images, { label: 'อัปโหลดรูปภาพ', folder: 'images', image: true, noCover: true, accept: 'image/*', hint: 'ลากไฟล์มาวาง หรือคลิกเพื่อเลือก · รูปใหญ่เกิน 1.5 MB จะถูกย่ออัตโนมัติ' });
+        LogoBox($('#fLogo'), function () { return $('#fSchool').value.trim(); }, $('#fSchool'));
+        $('#rf').addEventListener('paste', function (e) {
+          var items = (e.clipboardData && e.clipboardData.items) || [], file = null, k;
+          for (k = 0; k < items.length; k++) if (items[k].kind === 'file' && /^image\//.test(items[k].type)) { file = items[k].getAsFile(); break; }
+          if (!file) return;
+          e.preventDefault();
+          if (!fileUp.pastePreview(file)) { imgUp.add([file]); U.toast('วางภาพลงในรูปภาพผลงานเพิ่มเติมแล้ว', 'ok'); }
+        });
+        fileUp = Uploader($('#fFiles'), r.files, { onChange: function (l) { var w = $('#gspWarn'); if (w) w.innerHTML = l.some(function (f) { return U.isGsp(f.name); }) ? '<span style="color:var(--green)">✓ มีไฟล์ GSP แล้ว — ผู้ชมจะดาวน์โหลดไปเปิดในโปรแกรมได้</span>' : '<span style="color:#b07a00">ยังไม่มีไฟล์ .gsp — แนะนำให้แนบไฟล์ผลงานเพื่อให้ครูและนักเรียนนำไปฝึก</span>'; }, label: 'อัปโหลดไฟล์ผลงาน .gsp และเอกสารประกอบ', folder: 'files', kinds: FILE_KINDS_RES, gspPreview: true, accept: FILE_ACCEPT, hint: FILE_HINT });
         function lbl() {
           $('#fRankLbl').textContent = $('#fRank').value ? U.rankLabel($('#fRank').value) : '';
           var auto = U.medalAuto($('#fScore').value, DB.settings);
@@ -657,6 +707,102 @@
         return load().then(function () { go('results'); });
       }).catch(function (e) { busy(btn, false); handleErr(e); });
     };
+  }
+
+  /* ================= โรงเรียน / โลโก้ ================= */
+  function schoolList() {
+    var m = {}, list = [];
+    function get(name) {
+      var k = U.normSchool(name);
+      if (!k) return null;
+      if (!m[k]) { m[k] = { name: name, n: 0, logo: U.logoOf(name) }; list.push(m[k]); }
+      return m[k];
+    }
+    DB.results.forEach(function (r) { var o = get(r.school); if (o) o.n++; });
+    (DB.schools || []).forEach(function (s) { get(s.name); });
+    list.sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); });
+    return list;
+  }
+  function putSchool(name, logo) {
+    return API.call('saveSchool', { name: name, logo: logo }).then(function (s) {
+      var k = U.normSchool(name), hit = false;
+      DB.schools.forEach(function (x, i) { if (U.normSchool(x.name) === k) { DB.schools[i] = s; hit = true; } });
+      if (!hit) DB.schools.push(s);
+      U.setSchools(DB.schools);
+      return s;
+    });
+  }
+  function pickImage(cb) {
+    var inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.className = 'hidden';
+    document.body.appendChild(inp);
+    inp.onchange = function () { if (inp.files[0]) cb(inp.files[0]); if (inp.parentNode) inp.parentNode.removeChild(inp); };
+    inp.click();
+  }
+  function uploadLogo(name, file) {
+    if (!/^image\//.test(file.type)) { U.toast('โลโก้ต้องเป็นไฟล์รูปภาพ', 'err'); return Promise.reject(new Error('type')); }
+    UI.loading('กำลังบันทึกโลโก้…', name);
+    return API.upload(file, 'logos', 'โลโก้').then(function (meta) { return putSchool(name, meta); })
+      .then(function (s) { UI.close(); U.toast('จำโลโก้ ' + name + ' แล้ว', 'ok'); return s; })
+      .catch(function (e) { handleErr(e); throw e; });
+  }
+  /* กล่องโลโก้ในฟอร์มลงผล: แสดงโลโก้ที่จำไว้ตามชื่อโรงเรียนที่พิมพ์ */
+  function LogoBox(el, getName, input) {
+    var last = null;
+    function paint(force) {
+      var name = getName(), logo = name ? U.logoOf(name) : null;
+      if (force !== true && last !== null && last === name) return;
+      last = name;
+      el.innerHTML = '<div class="logo-box">' + (name ? U.logoHtml(name, 'lg') : '<span class="slogo ini lg">?</span>') +
+        '<div>' + (logo ? '<span class="tag green">✓ จำโลโก้ไว้แล้ว</span>' : (name ? '<span class="tag gray">ยังไม่มีโลโก้</span>' : '<span class="muted" style="font-size:12.5px">พิมพ์ชื่อโรงเรียนก่อน</span>')) +
+        (name ? '<button type="button" class="btn btn-sm" data-lg>' + ICON('upload') + (logo ? 'เปลี่ยน' : 'อัปโหลด') + '</button>' : '') + '</div></div>';
+      var b = $('[data-lg]', el);
+      if (b) b.onclick = function () { pickImage(function (f) { uploadLogo(getName(), f).then(function () { paint(true); }, function () {}); }); };
+    }
+    var t = null;
+    input.addEventListener('input', function () { clearTimeout(t); t = setTimeout(paint, 250); });
+    input.addEventListener('change', paint);
+    paint();
+  }
+  function viewSchools() {
+    var list = schoolList(), withImg = DB.results.filter(function (r) { return (r.images || []).length && !U.logoOf(r.school); }).length;
+    var noLogo = list.filter(function (o) { return !o.logo; }).length;
+    $('#view').innerHTML = pageHead('โรงเรียน / โลโก้', 'ระบบจำโลโก้ตามชื่อโรงเรียน — อัปโหลดครั้งเดียว ใช้กับทุกผลงานทุกปี') +
+      (withImg ? '<div class="panel" style="margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;border-color:#f0d98a;background:#fffaf0">' + ICON('star') +
+        '<div style="flex:1;min-width:240px"><b>พบผลงาน ' + withImg + ' รายการของโรงเรียนที่ยังไม่มีโลโก้ แต่มีรูปในช่องรูปภาพแบบเดิม</b><br><span class="muted" style="font-size:13.5px">ถ้าเคยใส่โลโก้เป็นภาพปกไว้ กดปุ่มเพื่อย้ายภาพแรกของผลงานเหล่านี้ไปเป็นโลโก้โรงเรียน (ไฟล์ใน Drive ไม่ถูกลบ)</span></div>' +
+        '<button class="btn btn-primary" id="migBtn">ย้ายเป็นโลโก้โรงเรียน</button></div>' : '') +
+      '<div class="toolbar"><div class="search">' + ICON('search') + '<input class="input" id="schQ" placeholder="ค้นหาโรงเรียน"></div>' +
+      '<span class="tag ' + (noLogo ? 'red' : 'green') + '">' + list.length + ' โรงเรียน · ยังไม่มีโลโก้ ' + noLogo + '</span></div>' +
+      '<div class="logo-grid" id="schGrid"></div>';
+    function paint() {
+      var q = U.normSchool($('#schQ').value);
+      $('#schGrid').innerHTML = list.filter(function (o) { return !q || U.normSchool(o.name).indexOf(q) > -1; }).map(function (o, i) {
+        o.logo = U.logoOf(o.name);
+        return '<div class="logo-card glow' + (o.logo ? '' : ' missing') + '">' + U.logoHtml(o.name, 'xl') + '<b>' + esc(o.name) + '</b><span class="muted">' + o.n + ' ผลงาน</span>' +
+          '<div class="row-actions" style="justify-content:center"><button class="btn btn-sm" data-up="' + esc(o.name) + '">' + ICON('upload') + (o.logo ? 'เปลี่ยน' : 'อัปโหลดโลโก้') + '</button>' +
+          (o.logo ? '<button class="icon-btn btn-danger" data-rm="' + esc(o.name) + '" title="ลบโลโก้">' + ICON('trash') + '</button>' : '') + '</div></div>';
+      }).join('') || '<div class="empty">ยังไม่มีโรงเรียน</div>';
+      $$('#schGrid [data-up]').forEach(function (b) { b.onclick = function () { var n = b.getAttribute('data-up'); pickImage(function (f) { uploadLogo(n, f).then(paint, function () {}); }); }; });
+      $$('#schGrid [data-rm]').forEach(function (b) {
+        b.onclick = function () {
+          var n = b.getAttribute('data-rm');
+          confirmBox('ลบโลโก้ของ <b>' + esc(n) + '</b> ?', 'ลบโลโก้', true).then(function (ok) {
+            if (ok) putSchool(n, null).then(function () { U.toast('ลบโลโก้แล้ว', 'ok'); paint(); }).catch(handleErr);
+          });
+        };
+      });
+    }
+    $('#schQ').oninput = paint;
+    if ($('#migBtn')) $('#migBtn').onclick = function () {
+      confirmBox('ย้ายภาพแรกของผลงาน ' + withImg + ' รายการไปเป็นโลโก้โรงเรียน?<br><span class="muted">โรงเรียนที่มีโลโก้อยู่แล้วจะไม่ถูกแทนที่</span>', 'ย้ายเลย').then(function (ok) {
+        if (!ok) return;
+        UI.loading('กำลังย้ายภาพเป็นโลโก้…');
+        API.call('migrateLogos', {}).then(function (d) {
+          return load().then(function () { UI.close(); UI.success('ย้ายเรียบร้อย', 'ได้โลโก้ใหม่ ' + d.schools + ' โรงเรียน จากผลงาน ' + d.moved + ' รายการ'); route(); });
+        }).catch(handleErr);
+      });
+    };
+    paint();
   }
 
   /* ================= รายงาน PDF / QR ================= */
