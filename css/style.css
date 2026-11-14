@@ -841,3 +841,25 @@ body.rp-open { overflow: hidden; }
 /* toast: ไม่มีฉากหลังมืด และไม่บังการคลิก */
 body.swal2-toast-shown .swal2-container, .swal2-container:has(.swal2-toast) { background: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; pointer-events: none; }
 .swal2-container .swal2-toast { pointer-events: all; }
+
+/* =========================================================
+   v6 — ระบบแบ่งหน้า (Pager)
+   ========================================================= */
+.pager { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; justify-content: space-between; margin: 16px 0 4px; font-size: 13.5px; color: var(--ink-3); }
+.pager.mini { justify-content: flex-end; }
+.pager.top { margin: 0 0 12px; }
+.pg-info b { color: var(--ink); font-weight: 600; }
+.pg-nav { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.pg-b { min-width: 34px; height: 34px; padding: 0 9px; border-radius: 9px; border: 1px solid var(--line-2); background: #fff; cursor: pointer; font: inherit; font-weight: 600; color: var(--ink-2); transition: .15s; }
+.pg-b:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); transform: translateY(-1px); }
+.pg-b.on { background: linear-gradient(135deg, #14213d, #2357d9); border-color: transparent; color: #fff; box-shadow: 0 6px 16px -6px rgba(35, 87, 217, .7); }
+.pg-b:disabled { opacity: .35; cursor: default; }
+.pg-gap { padding: 0 4px; align-self: center; }
+.pg-size select { margin-left: 6px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line-2); background: #fff; font: inherit; color: var(--ink); }
+.panel > .pager, .bp-card > .pager { padding: 0 14px 12px; }
+.bp .pager { color: #8d99b8; } .bp .pg-info b { color: #fff; }
+.bp .pg-b { background: rgba(255, 255, 255, .06); border-color: rgba(120, 150, 220, .25); color: #c9d2e8; }
+.bp .pg-b.on { background: linear-gradient(135deg, #2357d9, #4b7bff); color: #fff; }
+.bp .pg-size select { background: rgba(255, 255, 255, .06); color: #fff; border-color: rgba(120, 150, 220, .25); }
+.modal .pager { margin-top: 14px; }
+@media (max-width: 720px) { .pager { justify-content: center; } .pg-info { width: 100%; text-align: center; } }
