@@ -136,3 +136,152 @@ var UI = (function () {
   init();
   return { loading: loading, close: close, confirm: confirm, success: success, error: error, info: info, devModal: devModal, setSettings: setSettings, sparkles: sparkles, ready: has };
 })();
+
+/* =========================================================
+   Fx — เฟดข้อมูลขึ้นมา + เอฟเฟควิ๊บวับ (ใช้อัตโนมัติทุกหน้า)
+   - ทุกการ์ด/แถว/แผงข้อมูลที่เกิดขึ้นใหม่ จะค่อยๆ ลอยขึ้นเมื่อเลื่อนมาถึง (ทีละชิ้น)
+   - การ์ดมีแสงวิ่งผ่าน 1 ครั้ง, อันดับ 1–3 มีประกายดาว, ตัวเลขสถิตินับขึ้น, กราฟค่อยๆ วาดตัว
+   ========================================================= */
+var Fx = (function () {
+  'use strict';
+  var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var SEL = ['.card', '.pod', '.prob', '.stat', '.bp-card', '.kpi', '.panel', '.ann-group', '.tbl tbody tr', '.year-tbl tbody tr',
+    '.lb-row', '.log', '.logo-card', '.filelist .file', '.mini', '.top-list .it', '.sec-head', '.champ', '.comp-year',
+    '.up-item', '.announce', '.page-head', '.toolbar', '.pager', '.legend-d', '.dv-c', '.school-qr'].join(',');
+  var SWEEP = '.card, .pod, .prob, .kpi, .stat, .bp-card, .logo-card, .champ';
+  var COUNT = '.kpi b, .nk b, .mini b, .school-stats .stat b, .rp-stats b';
+  var SKIP = '.swal2-container, #reportRoot, #stats4, .modal-foot';
+  var io = null, pending = false;
+
+  function skip(el) { return !!(el.closest && el.closest(SKIP)); }
+  function sibIndex(el) {
+    var i = 0, p = el.previousElementSibling;
+    while (p && i < 14) { if (p.classList && p.classList.contains('fx')) i++; p = p.previousElementSibling; }
+    return i;
+  }
+  function prep(el) {
+    if (el._fx || skip(el)) return;
+    el._fx = 1;
+    /* แผงที่มีตาราง: ไม่เฟดทั้งแผง ให้แถวในตารางค่อยๆ ขึ้นแทน */
+    if (el.matches && el.matches('.panel, .ann-group') && el.querySelector('table')) return;
+    if (REDUCED || !io) return;
+    var r = el.getBoundingClientRect();
+    el.style.setProperty('--fxd', Math.min(sibIndex(el) * 55, 650) + 'ms');
+    el.classList.add('fx');
+    if (el.tagName === 'TR') el.classList.add('fx-row');
+    io.observe(el);
+    /* ถ้าองค์ประกอบอยู่บนจออยู่แล้วแต่ IO ยังไม่ทำงาน ให้แสดงภายหลังกันค้าง */
+    if (r.top < innerHeight && r.bottom > 0) setTimeout(function () { if (!el._shown) show(el); }, 1600);
+  }
+  function show(el) {
+    if (el._shown) return;
+    el._shown = 1;
+    if (io) io.unobserve(el);
+    var d = parseInt(el.style.getPropertyValue('--fxd'), 10) || 0;
+    el.classList.add('fx-show');
+    setTimeout(function () {
+      el.classList.remove('fx', 'fx-show', 'fx-row');
+      el.style.removeProperty('--fxd');
+    }, d + 900);
+    if (el.matches && el.matches(SWEEP)) sweep(el, d);
+    if (el.tagName === 'TR') setTimeout(function () { el.classList.add('fx-flash'); setTimeout(function () { el.classList.remove('fx-flash'); }, 1300); }, d + 150);
+    if (el.matches && el.matches('.t1, .t2, .t3, .champ')) setTimeout(function () { burst(el); }, d + 350);
+    U.$$(COUNT, el).concat(el.matches && el.matches(COUNT) ? [el] : []).forEach(function (b) { countUp(b, d); });
+    if (el.querySelector) U.$$('svg.chart', el).forEach(function (sv) { drawChart(sv, d); });
+  }
+  /* แสงวิ่งผ่าน 1 ครั้ง */
+  function sweep(el, d) {
+    var s = document.createElement('span');
+    s.className = 'fx-sweep';
+    s.style.animationDelay = (d + 200) + 'ms';
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    el.appendChild(s);
+    setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, d + 1500);
+  }
+  /* ประกายดาวแตกออก */
+  function burst(el) {
+    var n = 7, i;
+    for (i = 0; i < n; i++) {
+      var sp = document.createElement('span');
+      sp.className = 'fx-spark';
+      sp.style.left = (8 + Math.random() * 84) + '%';
+      sp.style.top = (6 + Math.random() * 60) + '%';
+      sp.style.animationDelay = (i * 90) + 'ms';
+      var z = 8 + Math.random() * 10;
+      sp.style.width = z + 'px'; sp.style.height = z + 'px';
+      el.appendChild(sp);
+      (function (x) { setTimeout(function () { if (x.parentNode) x.parentNode.removeChild(x); }, 1600 + i * 90); })(sp);
+    }
+  }
+  /* ตัวเลขนับขึ้น */
+  function countUp(b, d) {
+    if (b._counted) return;
+    var node = b.firstChild;
+    if (!node || node.nodeType !== 3) return;
+    var txt = node.nodeValue, m = /^([^\d-]*)(-?[\d,]+(?:\.\d+)?)(.*)$/.exec(txt.trim());
+    if (!m) return;
+    b._counted = 1;
+    var target = Number(m[2].replace(/,/g, '')), dec = (m[2].split('.')[1] || '').length, comma = m[2].indexOf(',') > -1;
+    if (!isFinite(target) || target === 0) return;
+    var t0 = null, dur = 900;
+    function fmt(v) {
+      var s = v.toFixed(dec);
+      if (comma || Math.abs(target) >= 1000) { var p = s.split('.'); p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ','); s = p.join('.'); }
+      return m[1] + s + m[3];
+    }
+    node.nodeValue = fmt(0);
+    setTimeout(function () {
+      function step(ts) {
+        if (!t0) t0 = ts;
+        var p = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+        node.nodeValue = fmt(target * e);
+        if (p < 1) requestAnimationFrame(step); else { node.nodeValue = txt; b.classList.add('fx-pop'); setTimeout(function () { b.classList.remove('fx-pop'); }, 600); }
+      }
+      requestAnimationFrame(step);
+    }, d);
+  }
+  /* กราฟค่อยๆ วาดตัว: เส้นลากตาม, แท่งโตขึ้น, จุดเด้ง */
+  function drawChart(sv, d) {
+    if (sv._drawn) return;
+    sv._drawn = 1;
+    U.$$('path', sv).forEach(function (p, i) {
+      if (!p.getTotalLength || p.getAttribute('fill') !== 'none' || p.getAttribute('stroke-dasharray')) return;
+      var L = 0;
+      try { L = p.getTotalLength(); } catch (e) { return; }
+      if (!L || L < 30) return;
+      p.style.strokeDasharray = L; p.style.strokeDashoffset = L;
+      p.style.transition = 'stroke-dashoffset 1.3s cubic-bezier(.4,0,.2,1) ' + (d + 150 + i * 60) + 'ms';
+      requestAnimationFrame(function () { requestAnimationFrame(function () { p.style.strokeDashoffset = 0; }); });
+      setTimeout(function () { p.style.strokeDasharray = ''; p.style.strokeDashoffset = ''; p.style.transition = ''; }, d + 1700 + i * 60);
+    });
+    U.$$('rect[rx="3"]', sv).forEach(function (r, i) { r.classList.add('fx-bar'); r.style.animationDelay = (d + 120 + i * 45) + 'ms'; });
+    U.$$('circle[r="5.5"]', sv).forEach(function (c, i) { c.classList.add('fx-dot'); c.style.animationDelay = (d + 500 + i * 40) + 'ms'; });
+  }
+
+  function scan(root) {
+    if (!root || !root.querySelectorAll) return;
+    U.$$('.bp', root).forEach(function (b) { if (!b._stars && !b.closest('.swal2-container')) { b._stars = 1; UI.sparkles(b, 22); } });
+    if (root.matches && root.matches(SEL)) prep(root);
+    U.$$(SEL, root).forEach(prep);
+  }
+  function queue() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; scan(document.body); });
+  }
+  function init() {
+    if ('IntersectionObserver' in window) {
+      io = new IntersectionObserver(function (ents) {
+        ents.forEach(function (e) { if (e.isIntersecting) show(e.target); });
+      }, { threshold: 0.06, rootMargin: '0px 0px -30px 0px' });
+    }
+    scan(document.body);
+    if ('MutationObserver' in window) {
+      new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) if (muts[i].addedNodes.length) { queue(); return; }
+      }).observe(document.body, { childList: true, subtree: true });
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  return { scan: scan, burst: burst };
+})();
