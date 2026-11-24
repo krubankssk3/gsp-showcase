@@ -863,3 +863,61 @@ body.swal2-toast-shown .swal2-container, .swal2-container:has(.swal2-toast) { ba
 .bp .pg-size select { background: rgba(255, 255, 255, .06); color: #fff; border-color: rgba(120, 150, 220, .25); }
 .modal .pager { margin-top: 14px; }
 @media (max-width: 720px) { .pager { justify-content: center; } .pg-info { width: 100%; text-align: center; } }
+
+/* =========================================================
+   v7 — เฟดข้อมูลขึ้นมา + เอฟเฟควิ๊บวับ
+   ========================================================= */
+.fx { opacity: 0; transform: translateY(18px) scale(.985); filter: blur(3px); }
+.fx.fx-row { transform: translateX(-16px); filter: none; }
+.fx.fx-show { opacity: 1; transform: none; filter: none;
+  transition: opacity .6s cubic-bezier(.2, .8, .2, 1), transform .75s cubic-bezier(.2, .8, .2, 1), filter .6s ease;
+  transition-delay: var(--fxd, 0ms); }
+/* แสงวิ่งผ่าน */
+.card, .kpi, .stat, .logo-card, .champ, .bp-card { overflow: hidden; }
+.bp-card .chart { overflow: visible; }
+.fx-sweep { position: absolute; inset: 0; z-index: 6; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .7) 48%, rgba(255, 255, 255, .15) 56%, transparent 66%);
+  transform: translateX(-130%); animation: fxSweep 1.1s cubic-bezier(.4, 0, .2, 1) forwards; }
+.bp .fx-sweep, .bp-card .fx-sweep { background: linear-gradient(110deg, transparent 30%, rgba(127, 168, 255, .35) 48%, rgba(70, 217, 255, .12) 56%, transparent 66%); }
+@keyframes fxSweep { to { transform: translateX(130%); } }
+/* แถวตารางวาบ */
+tr.fx-flash > td { animation: fxFlash 1.3s ease; }
+@keyframes fxFlash { 0% { background-color: rgba(35, 87, 217, .14); } 100% { background-color: transparent; } }
+.bp tr.fx-flash > td, .year-tbl tr.fx-flash > td { animation-name: fxFlashDark; }
+@keyframes fxFlashDark { 0% { background-color: rgba(91, 140, 255, .22); } 100% { background-color: transparent; } }
+/* ประกายดาวแตกออก */
+.fx-spark { position: absolute; z-index: 7; pointer-events: none; opacity: 0; animation: fxSpark 1.1s ease-out forwards;
+  background: radial-gradient(circle, #fff 0 18%, rgba(255, 236, 160, .95) 30%, transparent 62%);
+  -webkit-mask: conic-gradient(from 45deg, #000 0 5%, transparent 5% 20%, #000 20% 30%, transparent 30% 45%, #000 45% 55%, transparent 55% 70%, #000 70% 80%, transparent 80% 95%, #000 95%);
+  mask: conic-gradient(from 45deg, #000 0 5%, transparent 5% 20%, #000 20% 30%, transparent 30% 45%, #000 45% 55%, transparent 55% 70%, #000 70% 80%, transparent 80% 95%, #000 95%); }
+.fx-spark::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; background: #fff; box-shadow: 0 0 10px 3px rgba(246, 196, 69, .9); }
+@keyframes fxSpark { 0% { opacity: 0; transform: scale(.2) rotate(0); } 35% { opacity: 1; transform: scale(1.25) rotate(45deg); } 100% { opacity: 0; transform: scale(.5) rotate(120deg) translateY(-12px); } }
+/* ตัวเลขเด้งเมื่อนับเสร็จ */
+.fx-pop { display: inline-block; animation: fxPop .55s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes fxPop { 40% { transform: scale(1.18); text-shadow: 0 0 18px rgba(91, 140, 255, .8); } }
+/* กราฟ: แท่งโตขึ้น จุดเด้ง */
+.fx-bar { transform-box: fill-box; transform-origin: 50% 100%; animation: fxBar .8s cubic-bezier(.2, .9, .3, 1.15) both; }
+@keyframes fxBar { from { transform: scaleY(0); } }
+.fx-dot { transform-box: fill-box; transform-origin: center; animation: fxDot .5s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes fxDot { from { transform: scale(0); opacity: 0; } }
+/* ประกายต่อเนื่องบนเหรียญทอง/เงิน */
+.medal.gold, .medal.silver { position: relative; overflow: hidden; }
+.medal.gold::after, .medal.silver::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .55), transparent); transform: skewX(-20deg); animation: medalShine 3.8s ease-in-out infinite; }
+.medal.silver::after { animation-delay: 1.3s; }
+@keyframes medalShine { 0%, 62% { left: -60%; } 100% { left: 140%; } }
+.medal.gold::before { box-shadow: 0 0 0 0 rgba(201, 154, 26, .6); animation: medalDot 2.4s ease-in-out infinite; }
+@keyframes medalDot { 50% { box-shadow: 0 0 0 4px rgba(201, 154, 26, 0), 0 0 8px 2px rgba(246, 196, 69, .9); } }
+/* ดาวในแถบสีเข้ม */
+.bp > .wrap, .admin .bp > * { position: relative; z-index: 1; }
+.bp > .gsp-star { z-index: 0; }
+/* ป้าย GSP และอันดับกะพริบนุ่มๆ */
+.gsp-chip { animation: chipGlow 2.8s ease-in-out infinite; }
+@keyframes chipGlow { 50% { box-shadow: 0 0 22px rgba(70, 162, 255, 1); } }
+@media print { .fx { opacity: 1 !important; transform: none !important; filter: none !important; } .fx-sweep, .fx-spark { display: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  .fx { opacity: 1 !important; transform: none !important; filter: none !important; }
+  .fx-sweep, .fx-spark, .medal::after { display: none !important; }
+  .gsp-chip, .medal.gold::before, .fx-bar, .fx-dot { animation: none !important; }
+}
+.medal { white-space: nowrap; }
